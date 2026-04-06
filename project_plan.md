@@ -104,17 +104,38 @@ Module E  股票影响分析
 
 - **事件类型**（两阶段）：
   - Stage 1 粗过滤：用 V1THEMES 中的灾难主题标签（如 `NATURAL_DISASTER_EARTHQUAKE`、`DISASTER_FIRE`）筛选文章，无需人工标注。
-  - Stage 2 分类器训练标签：silver labels 来自将文章与 GDACS 历史事件做时间 + 地理匹配（约 2000–5000 条）；gold 验证集来自 LLM 核验（约 500 条）。
-  - V1THEMES 不直接作为 event_type：同一类型主题碎片化（earthquake 分散为 EARTHQUAKE/TEMBLOR/TREMOR/AFTERSHOCKS 等多个标签），TC/DR 极度稀疏（台风季每15分钟窗口仅 ~2 条），分类器从全文统一解决。
+  - Stage 2 分类器训练标签：使用 SiliconFlow DeepSeek-R1-Distill-Qwen-7B 对 `training_events_gdelt.xlsx` 中每类各 2000 条文章（共 8481 条）进行 LLM 标注，去除 error（86 条）后得到 **8395 条有效标签**。
+  - V1THEMES 不直接作为 event_type：同一类型主题碎片化（earthquake 分散为 EARTHQUAKE/TEMBLOR/TREMOR/AFTERSHOCKS 等多个标签），TC/DR 极度稀疏，分类器从全文统一解决。
+  - LLM 标注与原始粗筛标签的同意率：wildfire 81%、drought 75%、earthquake 79%、flood 71%、**cyclone 52%**（最低，31% 被标为 not_related）。
 
 - **严重性**：GDACS `alertlevel` → 二分类（`green` vs `orange_or_red`）。
 
 - **股票影响**：事件后 CAR(T+1/T+3/T+5)，无需人工标注。
 
-### 3.4 数据规模（预期）
+### 3.4 数据集与切分
 
-- 新闻文本：约 20,000–30,000 篇（2024–2025）
-- 严重性训练：EQ ~1000–2000 条，TC ~300–500，WF ~100–200，DR ~150–300，FL 规则无需训练数据
+**事件类型分类器数据集**（`data/splits/`）
+
+切分策略：**按时间线切分**，防止同一灾难事件的多篇报道跨 train/test 造成数据泄露。
+
+| 集合 | 时间范围 | 行数 | 占比 |
+|------|---------|------|------|
+| train | 2024-01 ≤ t ≤ 2025-04 | 5680 | 67.7% |
+| val   | 2025-05 ≤ t ≤ 2025-07 | 1037 | 12.4% |
+| test  | t > 2025-07           | 1678 | 20.0% |
+
+各集合标签分布（注：cyclone 是最稀缺类，训练时需 `class_weight`）：
+
+| 标签 | train | val | test |
+|------|-------|-----|------|
+| wildfire | 1289 | 267 | 247 |
+| earthquake | 1133 | 190 | 366 |
+| flood | 1054 | 254 | 394 |
+| drought | 832 | 113 | 196 |
+| not_related | 730 | 139 | 260 |
+| cyclone | 642 | 74 | 215 |
+
+**严重性训练数据**：GDACS API 历史事件，EQ ~1000–2000 条，TC ~300–500，WF ~100–200，DR ~150–300，FL 规则无需训练数据。
 
 ### 3.5 GDELT 采集实现说明（组员代码 `src/data_collection/gdelt.py`）
 
@@ -230,10 +251,11 @@ KeyBERT 提取每篇文章核心关键词，供展示和分析用；不作为严
 | 指标 | 说明 |
 |------|------|
 | 6类 Macro-F1 | 主要指标，含 not_related 类 |
-| Per-class F1 | 重点关注 cyclone / drought（V1THEMES 最稀疏） |
+| Per-class F1 | 重点关注 cyclone（训练集最稀缺，仅 642 条） |
 | Not_related 精确率 | 误保留率（噪音进入后续 pipeline 的比例） |
 
-**数据**：~500 条 LLM 核验 gold 验证集。**Baseline**：V1THEMES 规则映射（无 not_related 类）。
+**数据**：时间切分（见 §3.4），val=1037 条，test=1678 条，均为 2025 年数据（时间上晚于训练集）。  
+**Baseline**：V1THEMES 规则映射（无 not_related 类）。
 
 ### 5.2 NER / 参数抽取
 

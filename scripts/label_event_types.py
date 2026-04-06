@@ -38,8 +38,8 @@ API_KEY = "sk-pnfnnlrdscgcemyjjhqtseekdcozuqylngsjcpenhpiqiujl"
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
 MODEL   = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
 
-DATA_FILE  = Path(__file__).parent / "data" / "training_events_gdelt.xlsx"
-OUTPUT_DIR = Path(__file__).parent / "data" / "llm_labels"
+DATA_FILE  = Path(__file__).parent.parent / "data" / "training_events_gdelt.xlsx"
+OUTPUT_DIR = Path(__file__).parent.parent / "data" / "llm_labels"
 
 VALID_LABELS = {"earthquake", "flood", "cyclone", "wildfire", "drought", "not_related"}
 
@@ -140,15 +140,17 @@ def label_range(start: int, end: int, workers: int, sample: int | None = None) -
     end = min(end, len(df_full))
     df = df_full.iloc[start:end].copy()
 
+    # Drop volcano — not a supported disaster type in our pipeline
+    before = len(df)
+    df = df[df["event_type"] != "volcano"].copy()
+    if len(df) < before:
+        print(f"Dropped {before - len(df)} volcano rows. Remaining: {len(df)}")
+
     # Uniform per-class sampling: each event_type gets at most `sample` rows.
-    # Volcano rows are kept in full (they become not_related labels — free signal).
     if sample is not None:
         parts = []
         for etype, group in df.groupby("event_type"):
-            if etype == "volcano":
-                parts.append(group)          # keep all volcano → becomes not_related
-            else:
-                parts.append(group.sample(min(len(group), sample), random_state=42))
+            parts.append(group.sample(min(len(group), sample), random_state=42))
         df = pd.concat(parts).sample(frac=1, random_state=42)  # shuffle, preserve original index
         counts = df["event_type"].value_counts().to_dict()
         print(f"Sampled {len(df)} rows (uniform per-class, cap={sample}): {counts}")
