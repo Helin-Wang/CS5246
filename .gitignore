@@ -1,0 +1,18 @@
+# Data files (too large / generated)
+data/
+models/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env
+
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
