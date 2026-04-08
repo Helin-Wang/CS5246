@@ -216,7 +216,7 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 | 字段 | 类型 | 消费方 | 说明 |
 |------|------|--------|------|
 | `location_text` | str | Module D, B | 最主要地名（城市/省/国家）；Module D 坐标缺失时用文本匹配；Module B 做 entity linking |
-| `lat`, `lon` | float | Module D | GKG V1LOCATIONS 直接提供，优先用；缺失时 fallback 地名 geocoding |
+| `lat`, `lon` | float | Module D | 从文本抽取：①文中坐标表达式（regex）②geonamescache 城市坐标 ③国家质心；均失败则 NaN |
 | `event_date` | date | Module D, E | 灾难发生日期，不是报道日期；Module D Δtime≤7d 窗口；Module E 事件研究基准日 T |
 | `primary_country` | str (ISO) | Module B, E | entity linking 入口 → 股票指数/行业映射 |
 | `low_confidence` | bool | Module C, E | 关键字段全 NaN 时为 True；Module C median imputation 兜底；Module E 标注数据质量 |
@@ -243,15 +243,35 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 
 #### 4.3.2 抽取方法
 
-**地点**
+**地点（全部从文本抽取，不依赖 GKG 结构化字段）**
 
-| 来源 | 优先级 | 说明 |
-|------|--------|------|
-| GKG V1LOCATIONS | 高 | 结构化字段，含 lat/lon；格式 `type#name#countrycode#adm1code#lat#lon#...` |
-| spaCy `en_core_web_sm` GPE/LOC | 中 | 从文章文本抽地名；覆盖 GKG 未命名的城市级地点 |
-| 标题优先 | 高 | 标题中出现的地名通常更准确，权重高于正文地名 |
+四个字段的提取流程：
 
-primary_country：GKG countrycode 字段直接取；缺失时用 spaCy 地名 → `pycountry` 映射。
+**`location_text`（最主要地名）**
+
+新闻中有三类地名需要区分，处理顺序：
+1. spaCy `en_core_web_sm` 在 title + 正文前 3 句提取所有 GPE/LOC 实体
+2. **过滤电头**：若文章开头匹配 `^[A-Z]{2,}\s*\(`（如 `"BEIJING (Reuters) —"`），跳过第一个 GPE
+3. **优先事件地名**：保留与灾难触发词（struck/hit/flooded/burned/made landfall/affected）同句的 GPE
+4. Fallback：取 title 中第一个 GPE；再 fallback 正文第一个 GPE
+
+**`country`（ISO-2 代码）**
+
+`location_text` → 国家，两步离线映射：
+1. `geonamescache`：~25k 城市数据库，城市名直接查对应国家代码
+2. `pycountry`：匹配国家全称 / 常用别名
+3. 自定义补丁表：覆盖常见变体（"America"→US，"South Korea"→KR，"Britain"→GB 等）
+
+**`lat`, `lon`**
+
+按置信度降序，取第一个非空来源：
+
+| 优先级 | 来源 | 说明 |
+|--------|------|------|
+| 1 | **文本中的坐标表达式** | regex 匹配 `23.5°N 121.6°E`、`latitude 38.1, longitude 142.4`、`(38.1N, 142.4E)` 等；多见于地震报道、官方公报 |
+| 2 | **geonamescache 城市坐标** | location_text 在城市数据库中精确匹配时，取城市质心 |
+| 3 | **国家质心静态字典** | 仅解析出 country 但无城市级匹配时，用约 50 个高频灾害国家的质心坐标 |
+| 4 | NaN | location_text 和 country 均无法解析 |
 
 **时间（event_date）**
 
