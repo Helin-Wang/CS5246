@@ -321,11 +321,32 @@ class LocationResult:
 
 **时间（event_date）**
 
-使用 `dateparser` + 触发词角色判别（详见 `plans/disaster_time_extraction_0c0c4314.plan.md`）：
-- 优先抽取文中与灾难触发动词（struck/hit/made landfall/broke out）相邻的时间表达
-- `RELATIVE_BASE` 设为 GKG DATE，相对时间（"yesterday", "last Friday"）归一化
-- 无高置信候选时 fallback 到 GKG DATE（对 EQ/TC/WF/FL 误差通常≤1天）
-- DR 特殊处理：提取 "since [month]" 区间起点
+**抽取策略**：`dateparser` + 触发词角色判别：
+1. 优先候选：与灾难触发动词（struck/hit/made landfall/broke out/started）同句的时间表达
+2. 相对时间（"yesterday", "last Friday"）：`RELATIVE_BASE` 设为 GKG DATE 归一化
+3. 无高置信候选时 fallback 到 GKG DATE（EQ/TC/WF/FL 误差通常 ≤1天）
+4. DR 特殊处理：提取 "since [month]" 区间起点，精度为月
+
+**GT 标注策略（LLM 自动，`scripts/label_times.py`）**：
+
+- 模型：DeepSeek-V3 via SiliconFlow
+- 输入：`data/llm_labels/time_labels_test_input.csv`（778行，已过滤 not_related）
+- 输出：`data/llm_labels/time_labels_test.csv`
+
+**输出字段**：
+
+| 字段 | 含义 |
+|------|------|
+| `event_date_raw` | 文中原始时间表达（逐字复制，如 "Thursday", "since May"） |
+| `event_date_iso` | LLM 推断的具体日期（YYYY-MM-DD），用 article timestamp 解析相对表达 |
+| `granularity` | 精度：`day` / `month` / `year` / `unknown` |
+| `time_type` | `event_date`（单点）/ `date_range`（区间）/ `duration_only`（仅时长）/ `unknown` |
+| `source_note` | 一句推理说明 |
+
+**关键设计决策**：
+- LLM 输出 ISO 日期而非原始表达，使 GT 可直接与规则抽取器的 `YYYY-MM-DD` 输出做数值比较
+- 允许用 article timestamp 推断相对/星期词（"Thursday" → 以报道日所在周推算）
+- 禁止输出 week 粒度；`non_event_time` 不单独设类（not_related 已在上游过滤）
 
 **数值参数（regex + 单位归一化）**
 
@@ -394,177 +415,55 @@ NOTE: <一句推理说明>
 - 速率：~8 行/分钟（API 响应 ~7-8 秒/行）
 - 完整标注 1011 行需 ~120 分钟
 
-**评估指标与 GT 对标**
+**评估指标与 GT 对标**（仅灾难类文章，过滤 not_related）
 
 LLM 的 `lat/lon` 来自模型内部知识（等价于城市质心），而规则抽取器的 `lat/lon` 严格来自文本显式坐标。
 
-| 指标 | 计算方式 | 目标 | 当前结果 |
+评估数据集：1011 行中过滤 not_related（233行）→ 778行灾难类；再过滤 LLM error（14行）→ **764行有效 GT**。
+
+**整体结果**（n=764，灾难类全量测试集）：
+
+| 指标 | 计算方式 | 目标 | 实测结果 |
 |------|--------|------|--------|
-| 国家准确率 | pred_country_iso2 == gt_country_iso2（在 GT 可比行上） | ≥ 90% | **93.1%** (202/217 comparable) |
-| 地名覆盖率 | pred_location_text 非 Null 的比例 | ≥ 90% | **94.2%** (244/259) |
-| 坐标误差 (km) | haversine(pred_lat/lon, gt_lat/lon)，仅在规则抽取器 confidence=="coords_text" 时计算 | ≤ 100km | N/A (文本坐标极稀少) |
+| 国家准确率 | pred_country == gt_country（两边均有国家时） | ≥ 90% | **91.1%** (596/654 comparable) |
+| 地名覆盖率 | pred_location_text 非 Null 的比例 | ≥ 90% | **97.3%** (743/764) |
+| 坐标误差 (km) | haversine(pred, gt)，仅 confidence=="coords_text" 时计算 | ≤ 100km | 0.0 km（1 对，EQ 文本坐标）|
 
-**评估脚本**：`src/eval_location_extractor.py --verbose --per-class`
+**按灾种结果**：
 
-**已知失败模式**（共 14 例）
-1. **多地名消歧** (4 例)：文章同时提及 Hawaii（新闻中或影响范围）和 Kamchatka（震中）→ 优先级判别困难
-2. **跨境地名** (3 例)：Hindukush (AF/PK), Tawi River (IN/PK), Islam Qala (AF/IR) → 地名在 geonamescache 中倾向一个国家
-3. **城市同名剩余** (2 例)：Kingston (Jamaica vs Ontario) → 人口优先仍不完美
-4. **影响范围 vs 震源** (2 例)：wildfire in Canada but smoke in NYC → NER 优先级未完全解决
-5. **小地名缺失** (3 例)：Segamat (MY), Hainan (CN)，邻近城市被优先（Singapore, Vietnam）
+| 灾种 | n | 国家准确率 | 覆盖率 | 错误数 |
+|------|---|-----------|-------|-------|
+| EQ | 197 | **94.1%** (188 可比) | 98.5% | 11 |
+| FL | 178 | **94.1%** (153 可比) | 96.1% | 9 |
+| DR | 94 | **94.8%** (77 可比) | 91.5% | 4 |
+| WF | 104 | **90.2%** (82 可比) | 98.1% | 8 |
+| TC | 191 | **83.1%** (154 可比) | 99.5% | 26 |
 
-**NER 参数 GT 标注（人工）**：
+**Confidence breakdown**：88.1% location，11.8% none，0.1% coords_text
 
-**样本量**：每类 10 篇 × 5 类 = **50 篇**，从 `data/splits/test.csv` 中按 event_type 分层随机抽取。
+**评估脚本**：`src/eval_location_extractor.py --per-class`
 
-**标注字段**（每篇人工填写）：
+**已知失败模式**（共 58 例）：
 
-| 字段 | 所有类型 | EQ | TC | WF | DR | FL |
-|------|---------|----|----|----|----|-----|
-| `gt_location` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `gt_event_date` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `gt_country` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `gt_magnitude` | | ✓ | | | | |
-| `gt_depth_km` | | ✓ | | | | |
-| `gt_wind_speed_kmh` | | | ✓ | | | |
-| `gt_storm_surge_m` | | | ✓ | | | |
-| `gt_burned_area_ha` | | | | ✓ | | |
-| `gt_people_affected` | | | | ✓ | | |
-| `gt_duration_days` | | | | ✓ | ✓ | |
-| `gt_dead` | | | | | | ✓ |
-| `gt_displaced` | | | | | | ✓ |
-| `gt_field_present` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 类别 | 例数 | 典型案例 |
+|------|------|---------|
+| **影响区域 vs 事件起源** | ~15 | EQ: 文章聚焦 Hawaii（影响）→ 实际 Russia（震源）；WF: 加拿大野火影响美国 |
+| **TC 跨国报道** | ~12 | 台风路径覆盖多国，TW/CN/PH/VN 互混（占 TC 错误 46%）|
+| **跨境地名** | ~8 | Hindukush(AF/PK)、Tawi River(PK/IN)、Punjab(PK/IN)、Islam Qala(AF/IR) |
+| **城市同名** | ~5 | Kingston(JM vs CA)、Shelburne/Liverpool(CA vs GB) |
+| **小地名缺失** | ~5 | Segamat(MY)→Singapore，Hainan(CN)→Vietnam |
+| **别名缺失** | ~4 | Maine→Poland（误匹配）、B.C.→Beijing（缩写歧义）|
+| **其他** | 9 | — |
 
-**事件日期 GT 标注定义（gt_event_date 与 gt_event_date_precision）**
+> TC 国家准确率最低（83.1%）的根本原因：台风报道本身涉及多国路径，"中国广东"和"越南"和"台湾"可能同时在文中出现，NER 优先级无法覆盖所有情况。
 
-**核心原则**：`gt_event_date` 是**灾难物理发生的日期**，而非：
-- 报道日期（GKG DATE field）
-- 新闻发布日期
-- 政策宣布日期
-- 事后恢复/救援日期
-
-**gt_event_date_precision** 标注该日期的已知精度级别：
-- `"hour"`：精确到小时（如"3:45 AM on April 5"）
-- `"day"`：精确到日期（如"April 5, 2024"）
-- `"month"`：仅精确到月份（如"April 2024"）  
-- `"unknown"`：无法确定具体日期（如"数周前"或文中无明确时间）
-
-**灾种别具体定义与例子**：
-
-#### EQ（地震）— 震源破裂时刻
-
-**定义**：地震活动开始时间（通常为主震破裂时刻，若报道含余震序列则用**最强震的时间**）。
-
-| 情景 | 标注日期 | 精度 | 例子 |
-|------|---------|------|------|
-| 明确时刻 | 报道中明确的时间戳 | `"hour"` | "The 6.8M earthquake struck at 1:09 AM on April 3 near…" → `2024-04-03 01:09` |
-| 仅日期 | 报道的日期 | `"day"` | "A magnitude 7.2 earthquake hit Japan on January 15" → `2024-01-15` |
-| 日期+近似时段 | 日期取报道日；时段（晨/午/晚）可向上取整 | `"day"` | "The quake hit Monday afternoon" 如 GKG DATE 指向 Jan 15，则 `2024-01-15` |
-| 仅月份 | 月份首日 | `"month"` | "A major earthquake occurred in March 2024 in Nepal" → `2024-03-01` |
-| "数小时前"/"前天" | 以 GKG DATE 作参考，向下递推 | `"day"` | 报道日期 Apr 8，文中"前天凌晨"→ `2024-04-06` |
-| 报道不含时间或模糊 | 设为 GKG DATE 且标 `"unknown"` | `"unknown"` | 无明确时间表达 → 等同报道日期，但标记为不确定 |
-
-**特殊处理 — 余震**：
-- 若报道重点是主震，其后有余震列表 → 标注**主震日期**
-- 若报道重点是某次**强余震**且与主震差异 >2小时 → 标注**该强余震日期**（在 NOTE 中说明）
-
-#### TC（热带气旋）— 气旋生成或登陆时间
-
-**定义**：
-- 若报道重点是气旋**形成**或强度的演变 → 用**最早监测到旋转流动的时间** 
-- 若报道重点是**登陆**或**直接影响** → 用**登陆/直接影响开始时间**
-- 通常取最先发生的时间（形成 < 登陆）
-
-| 情景 | 标注日期 | 精度 | 例子 |
-|------|---------|------|------|
-| 明确登陆时间 | 报道中的登陆时刻 | `"hour"` | "Hurricane Maria made landfall in Puerto Rico at 3:15 PM EDT on September 20" → `2017-09-20 15:15` |
-| 形成 + 登陆都有，时差 >12小时 | 形成时间（更早） | `"day"` | "Storm formed on Monday, hit Philippines on Wednesday" → 形成日期 |
-| 仅登陆日期 | 登陆日期 | `"day"` | "Typhoon Haiyan made landfall on November 8" → `2013-11-08` |
-| GKG DATE 指向形成日，报道后续演变 | GKG DATE | `"day"` | GKG 报道日 + "over the past 48 hours strengthened to Cat-5" → 取 GKG DATE |
-| 进行中（无确定起点） | 最早提及的观测日 | `"month"` 或 `"day"` | "The monsoon has been active since June" → `2024-06-01` |
-
-#### WF（野火）— 火灾发生或蔓延开始
-
-**定义**：火灾**首次报告被发现或官方确认的时间**，而非：
-- 预计扑灭时间
-- 撤离开始时间
-- 损失评估时间
-
-| 情景 | 标注日期 | 精度 | 例子 |
-|------|---------|------|------|
-| 火灾开始时间已知 | 起火/首次发现时间 | `"hour"` 或 `"day"` | "A brush fire broke out at approximately 2 PM on August 5 in California" → `2024-08-05 14:00` |
-| 仅火灾日期 | 火灾日期 | `"day"` | "The wildfire started on July 15 in Oregon" → `2024-07-15` |
-| 多个火灾合并报道 | 第一场（最早）火灾日期 | `"day"` | "Series of fires erupted across Australia starting July 3" → `2024-07-03` |
-| 持续多日报道中 | 首次官方确认日 | `"day"` | 持续的野火，GKG DATE 为 Aug 20，但火灾从 Aug 15 开始 → `2024-08-15` |
-| 无明确起火时间 | GKG DATE（标 `"unknown"`） | `"unknown"` | 报道仅提"仍在蔓延，尚未控制" → GKG DATE，标记为不确定 |
-
-#### DR（干旱）— 干旱开始或察觉时间
-
-**定义**：干旱状态**被官方宣布或首次报告**的时间，通常涵盖**起点月份**。若文中有"since [month]"表述，则用该起点。
-
-| 情景 | 标注日期 | 精度 | 例子 |
-|------|---------|------|------|
-| 明确月份区间 | 起点月份首日 | `"month"` | "Severe drought hit East Africa since March 2023" → `2023-03-01` |
-| 相对时间表达 | 以 GKG DATE 推算 | `"month"` | 报道日 2024-07-15，文中"past 5 months drought"→ 从 2024-02-01（约5个月前） |
-| 仅"years" | 推测最初受影响的年份首日 | `"month"` | "Multi-year drought affecting region" + GKG DATE 2024-06 → `2022-01-01`（回溯2年） |
-| 持续数年但有加剧点 | 报道中**加剧或恶化**的月份（如果明确） | `"month"` | "Drought since 2019, but worsened in May 2024" → `2024-05-01` |
-| 宣布/警告日期 | 官方宣布日期 | `"month"` 或 `"day"` | "Government declared drought emergency on September 5" → `2024-09-05` |
-
-#### FL（洪水）— 洪水开始或首次报告时间
-
-**定义**：洪水**开始上升或首次观察到的时间**，而非：
-- 洪峰时间
-- 撤离时间
-- 降雨开始时间（除非直接导致闪洪）
-
-| 情景 | 标注日期 | 精度 | 例子 |
-|------|---------|------|------|
-| 明确洪水开始时间 | 官方开始或首报时刻 | `"hour"` 或 `"day"` | "Flash floods struck Kentucky early Thursday following intense rains on Wednesday" → 洪水开始 Thursday，或如有时刻则更精确 |
-| 仅洪水日期 | 洪水日期 | `"day"` | "Floods inundated parts of Bangladesh on August 10" → `2024-08-10` |
-| 降雨 + 洪水同报 | 首次洪水报告日（非降雨日） | `"day"` | "Monsoon rains from July 1 triggered floods starting July 3" → `2024-07-03` |
-| 逐日上升情报 | 首次超警戒水位日 | `"day"` | "River rose steadily; exceeded flood stage on May 12" → `2024-05-12` |
-| 无明确起点 | GKG DATE（标 `"unknown"`） | `"unknown"` | "Ongoing river levels elevated" 无具体起点 → GKG DATE + 不确定标记 |
-
----
-
-**gt_field_present 规则**（是否存在标注该字段的必要）
-
-`gt_field_present` 的含义：**文章内容足以人工标注该字段，即使标注值为 NaN/None**。
-
-| 字段 | 判定规则 | 例子 |
-|------|---------|------|
-| `gt_event_date` | 文中含任何与灾难**直接相关**的时间表达（日期/周期/相对时间）| ✓ "earthquake struck on April 5" / ✓ "drought since March" / ✗ "aid arrives next week"（援助不是灾难本身） |
-| `gt_location` | 文中含地名（城市、州、国家等），且能追溯到灾难发生的地理位置 | ✓ "Taiwan earthquake" / ✓ "wildfire in California" / ✗ "disaster summit held in Geneva"（会议地 ≠ 灾难地） |
-| `gt_country` | 能从文中确定灾难发生的国家（可从 location 推断） | 同 location 规则 |
-| `gt_magnitude`（EQ） | 文中明确提及震级数字 | ✓ "7.2 magnitude" / ✓ "measured at 6.8M" / ✗ "major earthquake"（无具体数值） |
-| `gt_wind_speed_kmh`（TC） | 文中有风速数据（任何单位） | ✓ "175 km/h winds" / ✓ "110 mph sustained" / ✗ "strong winds expected" |
-| `gt_burned_area_ha`（WF） | 文中有火灾面积/尺度描述（任何单位） | ✓ "100,000 hectares burned" / ✓ "5,000 acres" / ✗ "spread across mountains" |
-| `gt_dead`（FL/其他） | 文中有具体死亡人数 | ✓ "42 deaths reported" / ✓ "at least 10 killed" / ✗ "several deaths" |
-
-**annotation 工具与流程**
-
-标注工具：在 `data/gt/ner_gt_50.csv` 中预填 `idx / timestamp / label / text` 列，人工标注者填写 `gt_*` 列及 `source_note`。
-
-**标注单元**：每行一篇文章，分别标注 `gt_location`, `gt_country`, `gt_event_date`, `gt_event_date_precision`, `gt_field_present` 及 **灾种别字段**（`gt_magnitude`, `gt_wind_speed_kmh` 等）。
-
-**标注 NOTE 栏示例**（`source_note` 字段，供后续追踪和误差分析）：
-- `"Mainshock on Apr 3 01:09, report date Apr 3 14:00; aftershock data excluded"`
-- `"Typhoon formed Jun 15, made landfall Jun 18; using formation date per protocol"`
-- `"Fire started Jul 15 PM, no exact hour given; approximated to day precision"`
-- `"Drought ongoing since Feb 2023 per official declaration; precision limited to month"`
-
----
-
-**评估指标**：
+**评估指标**（对照 LLM GT）：
 
 | 指标 | 计算方式 | 目标 |
 |------|---------|------|
-| **字段解析率** | 模型抽到非 NaN 的比例（条件：gt_field_present=True） | EQ magnitude ≥ 60%，FL dead ≥ 55%，TC wind ≥ 50% |
-| **数值准确率** | \|pred - gt\| / gt ≤ 10% 的比例 | ≥ 70%（在已解析样本中） |
+| **事件日期误差** | \|pred_date - gt_date\| 的中位数（天） | EQ/TC/WF/FL ≤ 1 天，DR ≤ 14 天 |
 | **地名匹配率** | pred_country == gt_country 的比例 | ≥ 70% |
-| **事件日期误差** | \|pred_date - gt_date\| 的中位数（天） | EQ/TC/WF ≤ 1 天，DR ≤ 14 天，FL ≤ 1 天 |
-| **日期精度评估** | pred_precision 与 gt_precision 匹配比例 | ≥ 75% |
-| **low_confidence 误判率** | gt_field_present=True 但 low_confidence=True 的比例 | ≤ 20% |
+| **数值准确率** | \|pred - gt\| / gt ≤ 10% 的比例 | ≥ 70%（在已解析样本中） |
 
 **Baseline（对照）**：第一个数字 regex（不做单位换算，不做角色判别），用于说明 unified_event_extractor 的增量价值。
 

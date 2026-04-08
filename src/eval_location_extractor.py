@@ -53,9 +53,11 @@ def run_eval(verbose=False, per_class=False):
     gt = pd.read_csv(GT_FILE)
     articles = pd.read_csv(SPLITS_DIR / "test.csv")
 
+    # Drop not_related (location extractor only targets disaster articles)
+    gt = gt[gt["label"] != "not_related"].copy()
     # Drop rows where LLM returned error
     gt_ok = gt[~gt["location_text"].isin(["error", "Error"]) & gt["location_text"].notna()].copy()
-    print(f"GT rows: {len(gt)} total, {len(gt_ok)} valid (non-error)")
+    print(f"GT rows: {len(gt)} disaster-only, {len(gt_ok)} valid (non-error)")
 
     # Merge with article text
     merged = gt_ok.merge(articles[["idx", "text", "label"]], on="idx", how="inner", suffixes=("_gt", "_article"))
