@@ -58,7 +58,7 @@ def run_eval(verbose=False, per_class=False):
     print(f"GT rows: {len(gt)} total, {len(gt_ok)} valid (non-error)")
 
     # Merge with article text
-    merged = gt_ok.merge(articles[["idx", "text", "label"]], on="idx", how="inner")
+    merged = gt_ok.merge(articles[["idx", "text", "label"]], on="idx", how="inner", suffixes=("_gt", "_article"))
     print(f"Merged: {len(merged)} rows")
 
     records = []
@@ -90,7 +90,7 @@ def run_eval(verbose=False, per_class=False):
 
         records.append({
             "idx":              row["idx"],
-            "label":            row["label"],
+            "label":            row["label_article"],
             "gt_location":      row["location_text"],
             "gt_country":       gt_country,
             "gt_lat":           gt_lat,
