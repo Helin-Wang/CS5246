@@ -266,14 +266,15 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 
 **`lat`, `lon`**
 
-按置信度降序，取第一个非空来源（`LocationResult.confidence` 字段记录最终来源）：
+**仅从文章文本中的显式坐标表达式提取**，不使用城市质心或国家质心推断。
 
-| 优先级 | 来源 | confidence 值 | 说明 |
-|--------|------|-------------|------|
-| 1 | **文本中的坐标表达式** | `"coords_text"` | regex 匹配 `23.5°N 121.6°E`、`latitude 38.1, longitude 142.4`、`(38.1N, 142.4E)` 等；多见于地震报道、官方公报 |
-| 2 | **geonamescache 城市坐标** | `"city"` | location_text 在城市数据库中精确匹配时，取城市质心 |
-| 3 | **国家质心静态字典** | `"country"` | 仅解析出 country 但无城市级匹配时，用约 60 个高频灾害国家的质心坐标 |
-| 4 | NaN | `"none"` | location_text 和 country 均无法解析 |
+| 场景 | confidence 值 | 说明 |
+|------|-------------|------|
+| 文本中含坐标表达式 | `"coords_text"` | regex 匹配 `23.5°N 121.6°E`、`latitude 38.1, longitude 142.4`、`(38.1N, 142.4E)` 等；多见于地震报道 |
+| 无坐标，但有 location_text/country | `"location"` | lat/lon 为 None |
+| 无法解析任何地点 | `"none"` | 全为 None |
+
+> 不推断质心坐标的原因：推断坐标（如"加拿大不列颠哥伦比亚省"→53°N）与文章实际报道的精确位置偏差可能数百公里，对 Module D 的地理聚类反而有害。Module D 聚类策略：优先使用 `coords_text` 坐标；坐标缺失时退化为 `location_text` 字符串匹配。
 
 **时间（event_date）**
 
@@ -314,7 +315,9 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 
 **地点 GT 标注（LLM 自动）**：
 
-`scripts/label_locations.py` 使用 DeepSeek-V3 对 `data/splits/test.csv` 全量标注，输出 `data/llm_labels/location_labels_test.csv`。标注字段：`location_text`, `country_iso2`, `lat`, `lon`, `source_note`。错误行自动重试，支持断点续标。标注完成后运行 `src/eval_location_extractor.py` 对比规则抽取结果。
+`scripts/label_locations.py` 使用 DeepSeek-V3 对 `data/splits/test.csv` 全量标注，输出 `data/llm_labels/location_labels_test.csv`。标注字段：`location_text`, `country_iso2`, `lat`, `lon`, `source_note`。错误行自动重试，支持断点续标。
+
+LLM 提供的 `lat/lon` 来自模型知识（等价于城市质心），而规则抽取器的 `lat/lon` 仅来自文本中的显式坐标。因此主评估指标为 `country_iso2` 准确率；`lat/lon` 误差仅在规则抽取器提取到 `coords_text` 且 GT 也有坐标时才具可比性。标注完成后运行 `src/eval_location_extractor.py` 对比结果。
 
 **NER 参数 GT 标注（人工）**：
 
