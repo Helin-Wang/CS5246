@@ -6,13 +6,14 @@ disaster event time information.
 
 Output: data/llm_labels/time_labels_test.csv
 Columns:
-  idx, label, event_occurrence_date, granularity, date_range_end,
-  duration_days, time_type, source_note
+  idx, label, event_date_iso, event_date_raw, granularity,
+  time_type, source_note
 
 Note:
-- `event_occurrence_date` stores raw time expression from article
-  (e.g., "Thursday", "last month", "July 30"), not normalized date.
-- No date inference should be performed by LLM.
+- `event_date_iso`: LLM-inferred YYYY-MM-DD (uses article timestamp as reference
+  for weekday/relative expressions). N/A when genuinely undeterminable.
+- `event_date_raw`: verbatim time expression copied from article text.
+- No week-level granularity; types simplified to event_date/date_range/duration_only/unknown.
 
 Usage:
   python scripts/label_times.py
@@ -44,65 +45,66 @@ OUT_FILE = OUTPUT_DIR / "time_labels_test.csv"
 
 CHECKPOINT_EVERY = 50
 
-VALID_GRANULARITY = {"day", "week", "month", "year", "unknown", "n/a"}
-VALID_TIME_TYPE = {"event_date", "date_range", "duration_only", "non_event_time", "unknown", "n/a"}
+VALID_GRANULARITY = {"day", "month", "year", "unknown", "n/a"}
+VALID_TIME_TYPE = {"event_date", "date_range", "duration_only", "unknown", "n/a"}
 
 SYSTEM_PROMPT = (
     "You are a temporal information extractor for disaster news. "
-    "Extract the primary disaster event time, not publication time. "
+    "Extract the primary disaster event time, not the publication time. "
     "Always respond in the exact format requested."
 )
 
 USER_TEMPLATE = """\
-Extract time information for the PRIMARY disaster event in this article.
+Extract the time when the PRIMARY disaster event occurred or started.
 
 Rules:
-- event_occurrence_date: copy the original time expression from the article for when the disaster occurred or started.
-  Examples: "Thursday", "last month", "July 30", "Aug. 1, 2025", "since May".
-- Do NOT infer or convert to a precise calendar date if the article is relative/ambiguous.
-- granularity: one of day/week/month/year/unknown.
-- date_range_end: raw end-time expression if a range is explicitly stated, else N/A.
-- duration_days: numeric days if the article states duration (e.g., "for two weeks" -> 14). Else N/A.
+- event_date_raw: copy the verbatim time expression from the article (e.g. "Thursday", "last month", "July 30", "since May"). N/A if no time expression exists.
+- event_date_iso: infer the calendar date in YYYY-MM-DD format using the article timestamp as reference.
+  - Weekday expressions ("Thursday"): resolve relative to the article timestamp.
+  - Relative expressions ("yesterday", "two days ago"): subtract from the article timestamp.
+  - Month-only expressions ("since March"): use YYYY-MM-01; infer year from timestamp context.
+  - Only output N/A if the date is genuinely impossible to infer (e.g., "years ago" with no further clues).
+- granularity: precision of the inferred date — day / month / year / unknown.
 - time_type:
-  - event_date      : a single event date is clear
-  - date_range      : article indicates start/end period
-  - duration_only   : only duration is given, start date unclear
-  - non_event_time  : time mentions are forecast/background/policy and not main event time
-  - unknown         : insufficient evidence
-- Ignore publication time/dateline.
-- Do NOT use article timestamp to infer missing year/day.
+  - event_date    : single event date or start of event is identifiable
+  - date_range    : article indicates a start-to-end period
+  - duration_only : only a duration is given, no start date inferable
+  - unknown       : no usable time information for the event
+- Ignore datelines and publication timestamps.
+- Do NOT output week as granularity.
 
 Disaster type: {label}
-Article timestamp (metadata only, do not infer from it): {timestamp}
+Article timestamp (use as reference for relative time resolution): {timestamp}
 Article (title + snippet):
 {text}
 
 Respond ONLY in this exact format (no extra text):
-EVENT_DATE: <raw expression or N/A>
-GRANULARITY: <day|week|month|year|unknown>
-DATE_RANGE_END: <raw expression or N/A>
-DURATION_DAYS: <number or N/A>
-TIME_TYPE: <event_date|date_range|duration_only|non_event_time|unknown>
+EVENT_DATE_RAW: <verbatim expression or N/A>
+EVENT_DATE_ISO: <YYYY-MM-DD or N/A>
+GRANULARITY: <day|month|year|unknown>
+TIME_TYPE: <event_date|date_range|duration_only|unknown>
 NOTE: <one sentence reasoning>"""
 
 
-def _normalize_time_text(value: str | None) -> str | None:
+def _normalize_raw(value: str | None) -> str | None:
     if not value:
         return None
     v = value.strip()
     if v.upper() in {"N/A", "NA", "NONE", ""}:
         return None
-    v = re.sub(r"\s+", " ", v)
-    # Guardrail: if model appends inferred calendar date in parentheses after weekday,
-    # keep only the original weekday expression.
-    weekday_prefix = re.match(
-        r"^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b",
-        v,
-        flags=re.IGNORECASE,
-    )
-    if weekday_prefix and "(" in v and ")" in v:
-        v = weekday_prefix.group(1)
-    return v
+    return re.sub(r"\s+", " ", v)
+
+
+def _normalize_iso(value: str | None) -> str | None:
+    if not value:
+        return None
+    v = value.strip()
+    if v.upper() in {"N/A", "NA", "NONE", ""}:
+        return None
+    # Accept YYYY-MM-DD or YYYY-MM
+    if re.match(r"^\d{4}-\d{2}(-\d{2})?$", v):
+        return v
+    return None
 
 
 def _normalize_granularity(value: str | None) -> str:
@@ -123,40 +125,23 @@ def _normalize_time_type(value: str | None) -> str:
     return "unknown"
 
 
-def _normalize_duration(value: str | None) -> float | None:
-    if not value:
-        return None
-    v = value.strip()
-    if v.upper() in {"N/A", "NA", "NONE", ""}:
-        return None
-    try:
-        cleaned = re.sub(r"[^0-9.\-]", "", v)
-        if not cleaned:
-            return None
-        return round(float(cleaned), 2)
-    except Exception:
-        return None
-
-
 def _parse(raw: str) -> dict:
     def get(pattern: str, text: str):
         m = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
         return m.group(1).strip() if m else None
 
-    event_date = get(r"^EVENT_DATE:\s*(.+)$", raw) or get(r"EVENT_DATE:\s*(.+)", raw)
-    granularity = get(r"^GRANULARITY:\s*(.+)$", raw) or get(r"GRANULARITY:\s*(.+)", raw)
-    date_range_end = get(r"^DATE_RANGE_END:\s*(.+)$", raw) or get(r"DATE_RANGE_END:\s*(.+)", raw)
-    duration = get(r"^DURATION_DAYS:\s*(.+)$", raw) or get(r"DURATION_DAYS:\s*(.+)", raw)
-    time_type = get(r"^TIME_TYPE:\s*(.+)$", raw) or get(r"TIME_TYPE:\s*(.+)", raw)
-    note = get(r"^NOTE:\s*(.+)$", raw) or get(r"NOTE:\s*(.+)", raw)
+    event_date_raw = get(r"^EVENT_DATE_RAW:\s*(.+)$", raw) or get(r"EVENT_DATE_RAW:\s*(.+)", raw)
+    event_date_iso = get(r"^EVENT_DATE_ISO:\s*(.+)$", raw) or get(r"EVENT_DATE_ISO:\s*(.+)", raw)
+    granularity    = get(r"^GRANULARITY:\s*(.+)$", raw) or get(r"GRANULARITY:\s*(.+)", raw)
+    time_type      = get(r"^TIME_TYPE:\s*(.+)$", raw) or get(r"TIME_TYPE:\s*(.+)", raw)
+    note           = get(r"^NOTE:\s*(.+)$", raw) or get(r"NOTE:\s*(.+)", raw)
 
     return {
-        "event_occurrence_date": _normalize_time_text(event_date),
-        "granularity": _normalize_granularity(granularity),
-        "date_range_end": _normalize_time_text(date_range_end),
-        "duration_days": _normalize_duration(duration),
-        "time_type": _normalize_time_type(time_type),
-        "source_note": (note or "").strip()[:220],
+        "event_date_raw": _normalize_raw(event_date_raw),
+        "event_date_iso": _normalize_iso(event_date_iso),
+        "granularity":    _normalize_granularity(granularity),
+        "time_type":      _normalize_time_type(time_type),
+        "source_note":    (note or "").strip()[:220],
     }
 
 
@@ -170,7 +155,7 @@ def call_api(text: str, label: str, timestamp: str, max_retries: int = 5) -> dic
                 "content": USER_TEMPLATE.format(
                     label=label,
                     timestamp=timestamp,
-                    text=text[:800],
+                    text=text[:1200],
                 ),
             },
         ],
@@ -195,12 +180,11 @@ def call_api(text: str, label: str, timestamp: str, max_retries: int = 5) -> dic
             if attempt < max_retries - 1:
                 time.sleep(5 * (attempt + 1))
     return {
-        "event_occurrence_date": None,
-        "granularity": "unknown",
-        "date_range_end": None,
-        "duration_days": None,
-        "time_type": "unknown",
-        "source_note": "api_error",
+        "event_date_raw": None,
+        "event_date_iso": None,
+        "granularity":    "unknown",
+        "time_type":      "unknown",
+        "source_note":    "api_error",
     }
 
 
@@ -264,7 +248,7 @@ def main():
                 pbar.update(1)
                 pbar.set_postfix(
                     {
-                        "date": (res["event_occurrence_date"] or "N/A"),
+                        "iso":  (res["event_date_iso"] or "N/A"),
                         "type": res["time_type"],
                     }
                 )
@@ -277,14 +261,12 @@ def main():
     out_df = pd.read_csv(OUT_FILE)
 
     print(f"\nDone. Saved {len(out_df)} rows -> {OUT_FILE}")
-    has_date = out_df["event_occurrence_date"].notna().sum()
-    has_range_end = out_df["date_range_end"].notna().sum()
-    has_duration = out_df["duration_days"].notna().sum()
+    has_raw  = out_df["event_date_raw"].notna().sum()
+    has_iso  = out_df["event_date_iso"].notna().sum()
     api_errors = (out_df["source_note"] == "api_error").sum()
-    print(f"  has event date: {has_date} ({100 * has_date / len(out_df):.1f}%)")
-    print(f"  has range end:  {has_range_end} ({100 * has_range_end / len(out_df):.1f}%)")
-    print(f"  has duration:   {has_duration} ({100 * has_duration / len(out_df):.1f}%)")
-    print(f"  api_error rows: {api_errors}")
+    print(f"  has raw expression: {has_raw} ({100 * has_raw / len(out_df):.1f}%)")
+    print(f"  has ISO date:       {has_iso} ({100 * has_iso / len(out_df):.1f}%)")
+    print(f"  api_error rows:     {api_errors}")
 
 
 if __name__ == "__main__":
