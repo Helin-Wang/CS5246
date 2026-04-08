@@ -249,20 +249,63 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 
 四个字段的提取流程：
 
-**`location_text`（最主要地名）**
+**抽取流程（4 步）**
 
-新闻中有三类地名需要区分，处理顺序：
-1. spaCy `en_core_web_sm` 在 title + 正文前 3 句提取所有 GPE/LOC 实体
-2. **过滤电头**：若文章开头匹配 `^[A-Z]{2,}\s*\(`（如 `"BEIJING (Reuters) —"`），跳过第一个 GPE
-3. **优先事件地名**：保留与灾难触发词（struck/hit/flooded/burned/made landfall/affected）同句的 GPE
-4. Fallback：取 title 中第一个 GPE；再 fallback 正文第一个 GPE
+**Step 1 — 文本坐标 regex**
 
-**`country`（ISO-2 代码）**
+扫描全文，匹配显式坐标表达式：
+- `23.5°N 121.6°E` / `23.5N 121.6E`
+- `latitude 38.1, longitude 142.4`
+- `(38.1, 142.4)` （启发式：第一个数 ≤ 90 为纬度，第二个 ≤ 180 为经度）
 
-`location_text` → 国家，两步离线映射：
-1. `geonamescache`：~25k 城市数据库，城市名直接查对应国家代码
-2. `pycountry`：匹配国家全称 / 常用别名
-3. 自定义补丁表：覆盖常见变体（"America"→US，"South Korea"→KR，"Britain"→GB 等）
+找到则设 `lat/lon`，`confidence="coords_text"`；否则继续 Step 2。
+
+**Step 2 — NER 提取候选地名**
+
+spaCy `en_core_web_sm` 在 title + 正文前 3 句提取实体：
+- 标签：GPE / LOC（全选）
+- 特殊处理 ORG：仅当实体名在 alias 字典中时才接受（处理 spaCy 误分的印度邦 / SE 亚洲地名）
+- 排序优先级：
+  - 与灾难触发词（struck/hit/flooded/burned/made landfall）同句的实体优先（priority=0）
+  - 其他实体（priority=1）
+  - Title 实体优先于 body
+
+过滤 dateline："CITY (Reuters)" 格式中的第一个实体跳过。
+
+**Step 3 — 国家优先解析**
+
+对每个候选地名按序处理，**国家索引优先于城市索引**（防止城市同名遮蔽国家）：
+
+1. **国家索引**（alias 字典 + pycountry + geonamescache）
+   - Alias 覆盖范围：
+     - 常见变体（America→US, Britain→GB, Russia→RU）
+     - US 50 州（New Jersey→US, Hawaii→US）
+     - 加拿大 13 省（British Columbia→CA, B.C.→CA）
+     - 澳大利亚各州、印度各邦、中国省份、日本都道府县、印尼岛屿
+     - 河流（Ganga→IN, Nile→EG）防止误匹配
+     - 海外领土（Puerto Rico→PR, Guam→GU）
+   - 找到则返回 `location_text=name`, `country_iso2=code`
+
+2. **城市索引**（geonamescache ~25k 城市，按人口优先）
+   - 当多个城市同名时，选择人口最多者（Las Vegas→NV 而非 Venezuela）
+   - 过滤条件：名字长度 ≥3，非纯数字（防止邮编"33"→FI）
+   - 返回 `location_text=name`, `country_iso2=city_country_code`
+
+**Step 4 — Fallback**
+
+若所有候选都无法解析，保留 `location_text=gpes[0]` 但 `country_iso2=None`。尝试 partial match `"City, Country"` 格式继续解析国家。
+
+**输出：`LocationResult` 数据类**
+
+```python
+@dataclass
+class LocationResult:
+    location_text: Optional[str] = None   # 地名，不含国家
+    country_iso2:  Optional[str] = None   # ISO-2 国家代码（2 字符）
+    lat:           Optional[float] = None # 仅从 Step 1 坐标 regex，否则 None
+    lon:           Optional[float] = None
+    confidence:    str = "none"           # "coords_text" | "location" | "none"
+```
 
 **`lat`, `lon`**
 
@@ -311,13 +354,64 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 - DR：`duration_days` 缺失
 - FL：`dead` 和 `displaced` 均缺失
 
-#### 4.3.3 GT 标注方案（评估用）
+#### 4.3.3 GT 标注方案与评估
 
-**地点 GT 标注（LLM 自动）**：
+**地点 GT 标注（LLM 自动）**
 
-`scripts/label_locations.py` 使用 DeepSeek-V3 对 `data/splits/test.csv` 全量标注，输出 `data/llm_labels/location_labels_test.csv`。标注字段：`location_text`, `country_iso2`, `lat`, `lon`, `source_note`。错误行自动重试，支持断点续标。
+**脚本**：`scripts/label_locations.py`
 
-LLM 提供的 `lat/lon` 来自模型知识（等价于城市质心），而规则抽取器的 `lat/lon` 仅来自文本中的显式坐标。因此主评估指标为 `country_iso2` 准确率；`lat/lon` 误差仅在规则抽取器提取到 `coords_text` 且 GT 也有坐标时才具可比性。标注完成后运行 `src/eval_location_extractor.py` 对比结果。
+**LLM 模型与 API**
+- 模型：DeepSeek-V3 via SiliconFlow (`https://api.siliconflow.cn/v1/chat/completions`)
+- 数据集：`data/splits/test.csv` 全量 1011 行
+- 输出：`data/llm_labels/location_labels_test.csv`
+
+**标注字段**
+- `location_text`：地名（最主要的城市/国家）
+- `country_iso2`：ISO-2 国家代码
+- `lat`, `lon`：LLM 推断的坐标（基于其知识库，非文本抽取）
+- `source_note`：LLM 推理过程说明
+
+**Prompt 设计**
+
+LLM 被要求识别"灾难物理发生地"（非报道地或新闻社所在地），输出格式严格为：
+```
+LOCATION: <地名或 N/A>
+COUNTRY: <ISO-2 或 N/A>
+LAT: <小数或 N/A>
+LON: <小数或 N/A>
+NOTE: <一句推理说明>
+```
+
+**容错与恢复**
+- HTTP 429/403（限流）：等待 30s×(attempt+1)，最多 5 次重试
+- 其他异常：等待 5s×(attempt+1)，最多 5 次重试
+- 错误行标记为 `location_text="error"`，下次运行时自动重试
+- **断点续标**：resume 逻辑仅跳过成功的行，error 行总被重新请求
+
+**Workers**：1（单线程，避免 SiliconFlow 免费层限流 429）
+
+**性能**
+- 速率：~8 行/分钟（API 响应 ~7-8 秒/行）
+- 完整标注 1011 行需 ~120 分钟
+
+**评估指标与 GT 对标**
+
+LLM 的 `lat/lon` 来自模型内部知识（等价于城市质心），而规则抽取器的 `lat/lon` 严格来自文本显式坐标。
+
+| 指标 | 计算方式 | 目标 | 当前结果 |
+|------|--------|------|--------|
+| 国家准确率 | pred_country_iso2 == gt_country_iso2（在 GT 可比行上） | ≥ 90% | **93.1%** (202/217 comparable) |
+| 地名覆盖率 | pred_location_text 非 Null 的比例 | ≥ 90% | **94.2%** (244/259) |
+| 坐标误差 (km) | haversine(pred_lat/lon, gt_lat/lon)，仅在规则抽取器 confidence=="coords_text" 时计算 | ≤ 100km | N/A (文本坐标极稀少) |
+
+**评估脚本**：`src/eval_location_extractor.py --verbose --per-class`
+
+**已知失败模式**（共 14 例）
+1. **多地名消歧** (4 例)：文章同时提及 Hawaii（新闻中或影响范围）和 Kamchatka（震中）→ 优先级判别困难
+2. **跨境地名** (3 例)：Hindukush (AF/PK), Tawi River (IN/PK), Islam Qala (AF/IR) → 地名在 geonamescache 中倾向一个国家
+3. **城市同名剩余** (2 例)：Kingston (Jamaica vs Ontario) → 人口优先仍不完美
+4. **影响范围 vs 震源** (2 例)：wildfire in Canada but smoke in NYC → NER 优先级未完全解决
+5. **小地名缺失** (3 例)：Segamat (MY), Hainan (CN)，邻近城市被优先（Singapore, Vietnam）
 
 **NER 参数 GT 标注（人工）**：
 
@@ -583,14 +677,43 @@ Week 7（6月）：报告 + Demo
 
 ## 7. 技术栈
 
+### 地点抽取（Location Extraction）
+
+| 模块 | 工具 | 说明 |
+|------|------|------|
+| NER | spaCy `en_core_web_sm` | 提取 GPE/LOC 实体，支持 ORG fallback（带 alias 检查） |
+| 坐标 regex | Python `re` | 3 种格式：`23.5°N 121.6°E`、`lat X lon Y`、`(X,Y)` |
+| 地名→国家映射 | `geonamescache` + `pycountry` | ~25k 城市 + 250+ 国家，按人口优先 |
+| Alias 字典 | Python dict | ~150 项：美国 50 州、加拿大 13 省、印度邦、河流、岛屿等 |
+| 实现文件 | `src/location_extractor.py` | 849 行，单次运行 <0.5s/文章 |
+
+### 地点 GT 标注（LLM Labeling）
+
+| 模块 | 工具 | 说明 |
+|------|------|------|
+| LLM | DeepSeek-V3 | SiliconFlow API，$0.0009/1K tokens |
+| 容错 | exponential backoff | 429/403 等待 30s×(attempt+1)，max 5 次 |
+| 数据储存 | `location_labels_test.csv` | 1011 行，fields: location_text / country_iso2 / lat / lon / source_note |
+| 评估脚本 | `src/eval_location_extractor.py` | 国家准确率/覆盖率/误差统计，按 label 分组 |
+| 实现文件 | `scripts/label_locations.py` | 201 行，单线程 ~8 行/分钟 |
+
+### 事件类型分类（Event Type Classification）
+
+| 模块 | 工具 | 说明 |
+|------|------|------|
+| 模型 | DistilBERT-base-uncased | 6 分类，256M 参数，test Macro-F1 0.901 |
+| 损失函数 | WeightedTrainer | 类别不平衡补偿（cyclone/drought under-represented） |
+| Early Stopping | patience=2 | 选最佳 val Macro-F1 checkpoint（epoch 5） |
+| 推理 | batch=128，fp16 | test 精度 0.90，覆盖全 6 类 |
+| 实现文件 | `src/eval_event_classifier.py` | 推理脚本，输出每样本置信度 |
+| GT 数据 | `data/llm_labels/llm_labels_0_26326_s1000.csv` | 5000 行，按 DeepSeek-V3 标注 |
+
+### 其他核心工具
+
 | 类别 | 工具 |
 |------|------|
-| NLP | spaCy `en_core_web_sm`（GPE/LOC NER）|
-| 事件类型分类 | distilbert-base-uncased（微调）或 fastText |
-| 参数抽取 | Python `re` |
-| 关键词 | KeyBERT |
-| 严重性模型 | scikit-learn（RandomForest + Pipeline）|
-| Entity Linking | `pycountry`，`geonamescache` |
+| 参数提取 | Python `re`（regex + 单位换算） |
+| 严重性模型 | scikit-learn（RandomForest + Pipeline） |
 | 股票数据 | yfinance |
 | 环境 | Python 3.10+，conda env `gdelt` |
 
