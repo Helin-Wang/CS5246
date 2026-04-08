@@ -1,30 +1,27 @@
-#!/bin/bash
+#!/bin/bash -l
 #SBATCH --job-name=event_cls_distilbert
-#SBATCH --output=logs/train_distilbert_%j.out
-#SBATCH --error=logs/train_distilbert_%j.err
+#SBATCH --output=logs/train_distilbert_%j.log
+#SBATCH --time=2:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:1
-#SBATCH --time=02:00:00
+#SBATCH --gres=gpu:h100-96:1
 
-# ── Activate conda env ──────────────────────────────────────────────────────
-source "$(conda info --base)/etc/profile.d/conda.sh"
+source ~/miniconda3/etc/profile.d/conda.sh
 conda activate gdelt
 
-# ── Navigate to project root ─────────────────────────────────────────────────
-cd "$SLURM_SUBMIT_DIR"
+cd ~/CS5246
 
 mkdir -p logs models/event_classifier_distilbert
 
 echo "=============================="
-echo "Job ID   : $SLURM_JOB_ID"
-echo "Node     : $SLURMD_NODENAME"
-echo "GPU      : $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo 'n/a')"
-echo "Start    : $(date)"
+echo "Job ID : $SLURM_JOB_ID"
+echo "Node   : $SLURMD_NODENAME"
+echo "GPU    : $(nvidia-smi --query-gpu=name --format=csv,noheader)"
+echo "Start  : $(date)"
 echo "=============================="
 
-python src/train_event_classifier_distilbert.py \
+CUDA_VISIBLE_DEVICES=0 python src/train_event_classifier_distilbert.py \
     --epochs 10 \
     --batch-size 64 \
     --lr 2e-5
