@@ -209,6 +209,35 @@ Label distribution (train): not_related=913, wildfire=576, earthquake=539, cyclo
 
 Text format: `"{title} [SEP] {text_cleaned[:512]}"` — columns: `idx`, `timestamp`, `label`, `text`.
 
+### DistilBERT Training Strategy
+
+**Model**: `distilbert-base-uncased` fine-tuned for 6-class sequence classification.
+
+**Key design choices**:
+- **Weighted cross-entropy loss** (`WeightedTrainer`): class weights computed from training set distribution to handle imbalance (cyclone & drought are under-represented)
+- **Time-based split** (not random): prevents data leakage — future articles cannot inform past training
+- **Early stopping** (patience=2): best checkpoint selected by val Macro-F1; training stopped at epoch 7 (best was epoch 5)
+- **fp16** enabled on GPU for speed; `batch_size=64`, `lr=2e-5`, `warmup_ratio=0.1`, `weight_decay=0.01`
+- **Input format**: `"{title} [SEP] {text_cleaned[:512]}"`, max 128 tokens
+
+**Infrastructure**: NUS HPC SLURM, NVIDIA H100 NVL GPU. Training completed in ~25 seconds. Script: `scripts/train_distilbert_slurm.sh`.
+
+### Final Test Results (DistilBERT — checkpoint-270, epoch 5)
+
+| Class | Precision | Recall | F1 | Support |
+|-------|-----------|--------|----|---------|
+| earthquake | 0.95 | 0.97 | **0.960** | 199 |
+| wildfire | 0.91 | 0.99 | **0.947** | 109 |
+| cyclone | 0.91 | 0.94 | **0.926** | 193 |
+| flood | 0.93 | 0.91 | **0.922** | 182 |
+| drought | 0.86 | 0.91 | **0.882** | 95 |
+| not_related | 0.81 | 0.73 | **0.770** | 233 |
+| **macro avg** | **0.90** | **0.91** | **0.901** | 1011 |
+
+Val Macro-F1: **0.886** | Test Macro-F1: **0.901** | Test Accuracy: **0.90**
+
+Per-sample predictions saved to `data/results/distilbert_preds_{test,val}.csv` — columns: `idx`, `timestamp`, `label`, `pred_label`, `confidence`, `prob_*` (per-class), `correct`.
+
 ---
 
 ## Reference Implementation
