@@ -178,7 +178,7 @@ def main():
         learning_rate=args.lr,
         warmup_ratio=0.1,
         weight_decay=0.01,
-        eval_strategy="epoch",
+        evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
