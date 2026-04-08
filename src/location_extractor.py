@@ -83,8 +83,13 @@ _COUNTRY_ALIASES: dict[str, str] = {
     "south dakota": "US", "tennessee": "US", "texas": "US", "utah": "US",
     "vermont": "US", "virginia": "US", "washington": "US", "west virginia": "US",
     "wisconsin": "US", "wyoming": "US",
-    # US territories / common references
-    "puerto rico": "US", "us virgin islands": "US", "guam": "US",
+    # US territories — use actual ISO-2 codes
+    "puerto rico": "PR", "us virgin islands": "VI", "guam": "GU",
+    "u.s. virgin islands": "VI", "usvi": "VI",
+    # Common abbreviations as location text
+    "li": "US", "l.i.": "US",  # Long Island
+    # Explicit high-ambiguity city overrides (alias takes priority over city index)
+    "las vegas": "US",  # Las Vegas, NV vastly more prominent than Las Vegas, Venezuela
     # Province/state abbreviations
     "b.c.": "CA", "bc": "CA", "ont.": "CA", "que.": "CA", "sask.": "CA",
     "n.s.": "CA", "n.b.": "CA", "p.e.i.": "CA", "nfld.": "CA",
@@ -122,6 +127,16 @@ _COUNTRY_ALIASES: dict[str, str] = {
     # Other common sub-national to country
     "kashmir": "IN", "crimea": "UA", "catalonia": "ES",
     "sicily": "IT", "sardinia": "IT",
+    # Indian rivers (spaCy tags as GPE, otherwise map to AZ city "Ganja")
+    "ganga": "IN", "ganges": "IN", "brahmaputra": "IN", "yamuna": "IN",
+    "godavari": "IN", "krishna": "IN", "mahanadi": "IN", "cauvery": "IN",
+    "indus": "PK",
+    # Other well-known rivers that cause false city matches
+    "mekong": "VN", "irrawaddy": "MM", "salween": "MM",
+    "amazon": "BR", "orinoco": "VE", "parana": "BR",
+    "zambezi": "ZM", "niger": "NG", "nile": "EG",
+    "danube": "HU", "rhine": "DE", "thames": "GB",
+    "mississippi": "US", "colorado": "US", "columbia": "US",
 }
 
 # Country centroids for ~60 high-frequency disaster countries
@@ -188,6 +203,7 @@ _COUNTRY_CENTROIDS: dict[str, tuple[float, float]] = {
     # Asian territories
     "HK": (22.3, 114.2), "MO": (22.2, 113.5), "TW": (23.6, 121.0),
     "SG": (1.35, 103.8),
+    "PR": (18.2, -66.6), "VI": (17.7, -64.7), "GU": (13.4, 144.8),
 }
 
 # Subregion centroids: location_text (lowercase) → (lat, lon)
@@ -263,20 +279,34 @@ _DATELINE = re.compile(r"^([A-Z][A-Z\s]{1,30}?)\s*[,(]")
 _gc = geonamescache.GeonamesCache()
 
 def _build_city_index():
-    """Build a lowercase city-name → (country_iso2, lat, lon) index."""
-    idx: dict[str, tuple[str, float, float]] = {}
+    """Build a lowercase city-name → (country_iso2, lat, lon) index.
+
+    When multiple cities share a name, keep the one with the highest population
+    so that e.g. "Las Vegas" resolves to Nevada/US rather than Venezuela.
+    """
+    # First pass: collect all candidates per name with their population
+    candidates: dict[str, list[tuple[int, str, float, float]]] = {}
     for city in _gc.get_cities().values():
+        pop  = int(city.get("population") or 0)
+        code = city["countrycode"]
+        lat  = float(city["latitude"])
+        lon  = float(city["longitude"])
         name = city["name"].lower()
-        idx[name] = (city["countrycode"], float(city["latitude"]), float(city["longitude"]))
-        # also index ASCII name if different
+        candidates.setdefault(name, []).append((pop, code, lat, lon))
         alt = city.get("alternatenames", "")
         if alt:
-            # alternatenames may be a list or a comma-separated string
             names = alt if isinstance(alt, list) else alt.split(",")
             for a in names:
                 a = str(a).strip().lower()
-                if a and a not in idx:
-                    idx[a] = (city["countrycode"], float(city["latitude"]), float(city["longitude"]))
+                # Skip very short names and pure numeric strings (postal codes etc.)
+                if a and len(a) >= 3 and not a.isdigit():
+                    candidates.setdefault(a, []).append((pop, code, lat, lon))
+
+    # Second pass: keep highest-population entry per name
+    idx: dict[str, tuple[str, float, float]] = {}
+    for name, entries in candidates.items():
+        best = max(entries, key=lambda x: x[0])
+        idx[name] = (best[1], best[2], best[3])
     return idx
 
 _CITY_INDEX: dict[str, tuple[str, float, float]] | None = None
@@ -398,8 +428,11 @@ def _extract_gpe_entities(text: str, title: str) -> list[str]:
 
     body_gpes: list[tuple[str, int]] = []
     for ent in body_doc.ents:
+        # Accept GPE and LOC; also accept ORG only if the name is a known place alias
+        # (spaCy en_core_web_sm frequently misclassifies Indian/SE Asian place names as ORG)
         if ent.label_ not in ("GPE", "LOC"):
-            continue
+            if not (ent.label_ == "ORG" and ent.text.lower().strip() in _get_country_index()):
+                continue
         if dateline_name and ent.text.strip().lower() == dateline_name.lower():
             continue  # skip dateline city
         # Check if in a trigger sentence
