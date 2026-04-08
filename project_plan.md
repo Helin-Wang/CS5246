@@ -243,6 +243,8 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 
 #### 4.3.2 抽取方法
 
+**实现文件**：`src/location_extractor.py`（入口：`extract_location(text, title) → LocationResult`）
+
 **地点（全部从文本抽取，不依赖 GKG 结构化字段）**
 
 四个字段的提取流程：
@@ -264,14 +266,14 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 
 **`lat`, `lon`**
 
-按置信度降序，取第一个非空来源：
+按置信度降序，取第一个非空来源（`LocationResult.confidence` 字段记录最终来源）：
 
-| 优先级 | 来源 | 说明 |
-|--------|------|------|
-| 1 | **文本中的坐标表达式** | regex 匹配 `23.5°N 121.6°E`、`latitude 38.1, longitude 142.4`、`(38.1N, 142.4E)` 等；多见于地震报道、官方公报 |
-| 2 | **geonamescache 城市坐标** | location_text 在城市数据库中精确匹配时，取城市质心 |
-| 3 | **国家质心静态字典** | 仅解析出 country 但无城市级匹配时，用约 50 个高频灾害国家的质心坐标 |
-| 4 | NaN | location_text 和 country 均无法解析 |
+| 优先级 | 来源 | confidence 值 | 说明 |
+|--------|------|-------------|------|
+| 1 | **文本中的坐标表达式** | `"coords_text"` | regex 匹配 `23.5°N 121.6°E`、`latitude 38.1, longitude 142.4`、`(38.1N, 142.4E)` 等；多见于地震报道、官方公报 |
+| 2 | **geonamescache 城市坐标** | `"city"` | location_text 在城市数据库中精确匹配时，取城市质心 |
+| 3 | **国家质心静态字典** | `"country"` | 仅解析出 country 但无城市级匹配时，用约 60 个高频灾害国家的质心坐标 |
+| 4 | NaN | `"none"` | location_text 和 country 均无法解析 |
 
 **时间（event_date）**
 
@@ -309,6 +311,12 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 - FL：`dead` 和 `displaced` 均缺失
 
 #### 4.3.3 GT 标注方案（评估用）
+
+**地点 GT 标注（LLM 自动）**：
+
+`scripts/label_locations.py` 使用 DeepSeek-V3 对 `data/splits/test.csv` 全量标注，输出 `data/llm_labels/location_labels_test.csv`。标注字段：`location_text`, `country_iso2`, `lat`, `lon`, `source_note`。错误行自动重试，支持断点续标。标注完成后运行 `src/eval_location_extractor.py` 对比规则抽取结果。
+
+**NER 参数 GT 标注（人工）**：
 
 **样本量**：每类 10 篇 × 5 类 = **50 篇**，从 `data/splits/test.csv` 中按 event_type 分层随机抽取。
 
