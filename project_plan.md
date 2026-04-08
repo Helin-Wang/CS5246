@@ -209,21 +209,120 @@ NATURAL_DISASTER_HURRICANE, NATURAL_DISASTER_STORM, CRISISLEX_CRISISLEXREC
 
 ### 4.3 NER 与参数抽取（Module A，per-article）
 
-**地点**（两路互补）：spaCy `en_core_web_sm` GPE/LOC 得地名文本；GKG V1LOCATIONS 得 lat/lon 坐标。
+#### 4.3.1 需要抽取哪些字段（按下游用途）
 
-**时间**：直接用 GKG DATE 字段（col 0），精确到15分钟。
+每篇文章需要输出以下字段，按消费方分组说明必要性：
 
-**per-type 参数 regex 抽取**（与 GDACS 训练特征严格对齐）：
+| 字段 | 类型 | 消费方 | 说明 |
+|------|------|--------|------|
+| `location_text` | str | Module D, B | 最主要地名（城市/省/国家）；Module D 坐标缺失时用文本匹配；Module B 做 entity linking |
+| `lat`, `lon` | float | Module D | GKG V1LOCATIONS 直接提供，优先用；缺失时 fallback 地名 geocoding |
+| `event_date` | date | Module D, E | 灾难发生日期，不是报道日期；Module D Δtime≤7d 窗口；Module E 事件研究基准日 T |
+| `primary_country` | str (ISO) | Module B, E | entity linking 入口 → 股票指数/行业映射 |
+| `low_confidence` | bool | Module C, E | 关键字段全 NaN 时为 True；Module C median imputation 兜底；Module E 标注数据质量 |
+| **EQ** `magnitude` | float | Module C | 严重性模型第一特征（null rate 3.6%） |
+| **EQ** `depth_km` | float | Module C | 严重性模型特征（null rate 3.6%） |
+| **EQ** `rapid_pop_people` | float | Module C | 从 rapidpopdescription 文本解析数字人口数 |
+| **EQ** `rapid_pop_log` | float | Module C | log10(rapid_pop_people)，与 GDACS 训练特征对齐 |
+| **EQ** `rapid_missing` | float (0/1) | Module C | rapidpopdescription 缺失时=1 |
+| **EQ** `rapid_few_people` | float (0/1) | Module C | 描述含"few people"时=1 |
+| **EQ** `rapid_unparsed` | float (0/1) | Module C | 有描述但无法解析数字时=1 |
+| **TC** `wind_speed_kmh` | float | Module C | 最大持续风速，统一换算 km/h（null rate 37.4%） |
+| **TC** `storm_surge_m` | float | Module C | 风暴潮高度，换算为米（null rate 63%） |
+| **TC** `exposed_population` | float | Module C | 受影响人口数（null rate 73.8%） |
+| **WF** `burned_area_ha` | float | Module C | 过火面积，换算为公顷（null rate 2%） |
+| **WF** `people_affected` | float | Module C | 受影响人数（null rate 21%） |
+| **WF** `duration_days` | float | Module C | 持续天数 |
+| **DR** `affected_area_km2` | float | Module C | 受旱面积，换算为 km²（null rate 0%） |
+| **DR** `country_count` | float | Module C | 受影响国家数 |
+| **DR** `duration_days` | float | Module C | 持续天数 |
+| **FL** `dead` | float | Module C (规则) | 死亡人数；规则：dead>100 → orange_or_red |
+| **FL** `displaced` | float | Module C (规则) | 疏散人数；规则：displaced>80000 → orange_or_red |
+| `economic_loss_usd` | float | Module E | 经济损失估值（辅助，非模型输入） |
+| `affected_sectors` | list[str] | Module E | 受影响行业关键词（energy/transportation/agriculture 等），辅助 stock ticker 筛选 |
 
-| 类型 | 抽取字段 | 示例 |
+#### 4.3.2 抽取方法
+
+**地点**
+
+| 来源 | 优先级 | 说明 |
+|------|--------|------|
+| GKG V1LOCATIONS | 高 | 结构化字段，含 lat/lon；格式 `type#name#countrycode#adm1code#lat#lon#...` |
+| spaCy `en_core_web_sm` GPE/LOC | 中 | 从文章文本抽地名；覆盖 GKG 未命名的城市级地点 |
+| 标题优先 | 高 | 标题中出现的地名通常更准确，权重高于正文地名 |
+
+primary_country：GKG countrycode 字段直接取；缺失时用 spaCy 地名 → `pycountry` 映射。
+
+**时间（event_date）**
+
+使用 `dateparser` + 触发词角色判别（详见 `plans/disaster_time_extraction_0c0c4314.plan.md`）：
+- 优先抽取文中与灾难触发动词（struck/hit/made landfall/broke out）相邻的时间表达
+- `RELATIVE_BASE` 设为 GKG DATE，相对时间（"yesterday", "last Friday"）归一化
+- 无高置信候选时 fallback 到 GKG DATE（对 EQ/TC/WF/FL 误差通常≤1天）
+- DR 特殊处理：提取 "since [month]" 区间起点
+
+**数值参数（regex + 单位归一化）**
+
+实现于 `src/unified_event_extractor.py`，当前已覆盖：
+- `magnitude`：`magnitude/m/richter + 数字` 或 `M6.2` 格式
+- `depth_km`：`depth of N km/mi`，英里换算
+- `wind_speed_kmh`：knots×1.852、mph×1.609、m/s×3.6
+- `burned_area_ha`：acres×0.4047
+- `affected_area_km2`：sq mi×2.59
+- `storm_surge_m`：feet×0.3048
+- `dead`/`displaced`/`injured`/`missing`：人名 + 动词窗口绑定
+- `economic_loss_usd`：billion/million 换算
+
+**待补充**（当前 `unified_event_extractor.py` 缺失）：
+- `exposed_population`（TC）：`(\d[\d,]*)\s*(?:people|residents|inhabitants)\s*(?:exposed|at risk|in the path)`
+- `country_count`（DR）：`(\d+)\s*countries`、`across\s*(\d+)\s*nations`
+- `rapid_pop_people/log/flags`（EQ）：调用 `parse_rapidpopdescription()`，从 `rapidpopdescription` 字段文本解析（现已在 severity 训练脚本中实现，需移植到 Module A）
+- `affected_sectors`：已有 `sector_keywords` 字典，需输出到字段而非仅做 confidence 调整
+
+**置信度与 low_confidence 标记**
+
+关键字段（每个 event_type 的 severity 模型必需字段）全为 NaN 时，`low_confidence=True`：
+- EQ：`magnitude` 和 `depth_km` 均缺失
+- TC：`wind_speed_kmh` 缺失
+- WF：`burned_area_ha` 和 `people_affected` 均缺失
+- DR：`duration_days` 缺失
+- FL：`dead` 和 `displaced` 均缺失
+
+#### 4.3.3 GT 标注方案（评估用）
+
+**样本量**：每类 10 篇 × 5 类 = **50 篇**，从 `data/splits/test.csv` 中按 event_type 分层随机抽取。
+
+**标注字段**（每篇人工填写）：
+
+| 字段 | 所有类型 | EQ | TC | WF | DR | FL |
+|------|---------|----|----|----|----|-----|
+| `gt_location` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `gt_event_date` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `gt_country` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `gt_magnitude` | | ✓ | | | | |
+| `gt_depth_km` | | ✓ | | | | |
+| `gt_wind_speed_kmh` | | | ✓ | | | |
+| `gt_storm_surge_m` | | | ✓ | | | |
+| `gt_burned_area_ha` | | | | ✓ | | |
+| `gt_people_affected` | | | | ✓ | | |
+| `gt_duration_days` | | | | ✓ | ✓ | |
+| `gt_dead` | | | | | | ✓ |
+| `gt_displaced` | | | | | | ✓ |
+| `gt_field_present` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+标注工具：在 `data/gt/ner_gt_50.csv` 中预填 idx/text 列，人工填写 gt_* 列。GT 文件格式见 `scripts/build_ner_gt_sample.py`（待实现）。
+
+**评估指标**：
+
+| 指标 | 计算方式 | 目标 |
 |------|---------|------|
-| EQ | `magnitude`, `depth`, `rapidpopdescription` | `magnitude\s+(\d+\.?\d*)` |
-| TC | `wind_speed`(→km/h), `storm_surge`(→m), `exposed_population` | `(\d+)\s*(knots\|mph\|km/h)` |
-| WF | `duration_days`, `burned_area`(→ha), `people_affected` | `(\d+[\.,]?\d*)\s*(ha\|acres)` |
-| DR | `duration_days`, `affected_area`(→km²), `country_count` | `(\d+)\s*countries` |
-| FL | `dead`, `displaced` | `(\d+[\.,]?\d*)\s*(?:people\s+)?(?:killed\|dead)` |
+| **字段解析率** | 模型抽到非 NaN 的比例（条件：gt_field_present=True） | EQ magnitude ≥ 60%，FL dead ≥ 55%，TC wind ≥ 50% |
+| **数值准确率** | \|pred - gt\| / gt ≤ 10% 的比例 | ≥ 70%（在已解析样本中） |
+| **地名匹配率** | pred_country == gt_country 的比例 | ≥ 70% |
+| **事件日期误差** | \|pred_date - gt_date\| 的中位数（天） | EQ/TC/WF ≤ 1 天，DR ≤ 14 天 |
+| **low_confidence 误判率** | gt_field_present=True 但 low_confidence=True 的比例 | ≤ 20% |
 
-关键字段全为 NaN → 标记 `low_confidence=True`。
+**Baseline（对照）**：第一个数字 regex（不做单位换算，不做角色判别），用于说明 unified_event_extractor 的增量价值。
 
 ### 4.4 事件聚类去重（Module D）
 
