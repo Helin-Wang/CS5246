@@ -18,7 +18,8 @@ Two paths: offline training (GDACS → models) and online inference (GDELT news 
 
 ```
 【Offline Training】
-GDACS API → fetch_gdacs_*.py → data/gdacs_*_fields.csv
+GDACS API → fetch_gdacs_all_fields.py (unified) → data/gdacs_all_fields.csv
+          (or fetch_gdacs_*.py per-type in reference repo)
           → train_*.py → models/*.pkl (RandomForest binary classifier per disaster type)
           Label: alertlevel green=0 / orange_or_red=1
 
@@ -75,6 +76,77 @@ Final output per unique event: `event_id`, `event_type`, `event_date`, `primary_
 
 **GDACS API**: `https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH`. Requires `ssl._create_unverified_context()`. EQ `magnitude`/`depth` fields need `--enrich-details` (detail endpoint per event); basic fetch already returns `rapidpopdescription` with magnitude as text ("Magnitude 4.7M, Depth:131km").
 
+**GDACS API 分页行为（实测）**：
+- 事件按 `fromdate` **倒序**返回（最新在前）
+- 混合 alertlevel 请求（`alertlevel=green;orange;red`）时，orange/red 极稀少，`--limit-per-type` 的行数上限往往在触达 orange/red 页之前就耗尽
+- 必须使用 `--balanced-per-level` 按 alertlevel 分别独立拉取，才能保证 orange/red 样本量
+- WF/orange 全球历史（2018–2026）仅约 39 条，WF/red 仅约 5 条；EQ/red 约 36 条；DR/orange 约 36 条
+
+**Fetch 版本记录**：
+
+| 版本 | 命令 | 结果 | 问题 |
+|------|------|------|------|
+| v1（初始） | `--fromdate 2024-01-01 --limit-per-type 1000`（默认，非均衡模式） | EQ=1900(orange=1), TC=1438, WF=88(orange=0), DR=156(orange=12)，共 3582 行 | EQ/WF orange_or_red 严重不足，无法训练；EQ fromdate 范围仅 2025-12~2026-04（API 倒序+行数上限） |
+| v2（当前） | 见下方 balanced 命令 | EQ=670(green=500,orange=134,red=36), WF=544(green=500,orange=39,red=5), DR=258(green=216,orange=36,red=6)；合并 TC v1 后共 2910 行 | EQ/WF rapidpopdescription 全为空（detail enrichment 对 balanced 模式的 EQ 返回空字段，见训练注记）|
+
+**v1 产物**（`data/gdacs_all_fields.csv`，保留作参考，TC 数据质量可用）：
+- TC: 1438 行，green=1145, orange=171, red=122，fromdate 跨 2008–2026 ✅
+- EQ/WF/DR: 数据质量不可用于严重性分类训练
+
+**v2 fetch 命令**（EQ/WF/DR，balanced per alertlevel；TC 复用 v1）：
+```bash
+python scripts/fetch_gdacs_all_fields.py \
+  --event-types EQ,WF,DR \
+  --fromdate 2018-01-01 \
+  --todate 2026-04-07 \
+  --balanced-per-level 500 \
+  --page-cap 5000 \
+  --workers 6 \
+  --request-sleep-sec 0.15 \
+  --output data/gdacs_eq_wf_dr_balanced.csv
+```
+输出合并到 `data/gdacs_all_fields_v2.csv`（EQ/WF/DR balanced + TC from v1），共 2910 行。
+
+FL check intentionally excluded. DR detail endpoint 有间歇性 403（影响部分字段，非致命）。
+
+**各模型输入特征**（定义于 `scripts/train_severity_classifiers.py: TYPE_FEATURES`）：
+
+所有模型统一使用 `sklearn Pipeline`：`SimpleImputer(strategy="median")` → `RandomForestClassifier(class_weight="balanced")`。Null 值一律由 median imputation 填补，推理时行为一致。
+
+| 灾种 | 特征 | null rate（v2 训练数据） | null 处理 |
+|------|------|------------------------|----------|
+| EQ | `magnitude` | 3.6% | median imputation |
+| EQ | `depth` | 3.6% | median imputation |
+| EQ | `rapid_pop_people` | 36.3% | median imputation（NaN 来自 rapidpopdescription 为空） |
+| EQ | `rapid_pop_log` | 36.3% | median imputation（同上） |
+| EQ | `rapid_missing` | 0%（flag） | 无 null；rapidpopdescription 为空时=1.0，否则=0.0 |
+| EQ | `rapid_few_people` | 0%（flag） | 无 null；含"few people"时=1.0 |
+| EQ | `rapid_unparsed` | 0%（flag） | 无 null；无法解析数字且非"few people"时=1.0 |
+| TC | `maximum_wind_speed_kmh` | 37.4% | median imputation |
+| TC | `maximum_storm_surge_m` | 63.0% | median imputation（高缺失，特征贡献有限）|
+| TC | `exposed_population` | 73.8% | median imputation（高缺失，特征贡献有限）|
+| WF | `duration_days` | 0% | 无需处理 |
+| WF | `burned_area_ha` | 2.0% | median imputation |
+| WF | `people_affected` | 21.0% | median imputation |
+| DR | `duration_days` | 0% | 无需处理 |
+| DR | `affected_area_km2` | 0% | 无需处理 |
+| DR | `affected_country_count` | 0% | 无需处理 |
+
+> 推理时（Module C）必须用完全相同的特征名和单位传入，否则 pkl Pipeline 会报 KeyError。EQ 的 `rapid_*` 五个 flag 特征须先对新闻抽取到的 `rapidpopdescription` 文本运行 `parse_rapidpopdescription()` 生成，不能直接传文本。
+
+> **注**：训练脚本诊断输出曾错误显示 EQ `rapidpopdescription` null rate 100%，实为诊断代码对文本列误用 `pd.to_numeric` 所致（已修复）。实际数据：null rate 36%，`rapid_few_people` rate 12.5%，`rapid_unparsed` rate 0%，模型正常使用了全部 7 个特征。
+
+**v2 训练结果**（`scripts/train_severity_classifiers.py --input data/gdacs_all_fields_v2.csv`）：
+
+| 灾种 | split 方式 | test Macro-F1 | ROC-AUC | PR-AUC | 5-fold CV | 说明 |
+|------|-----------|--------------|---------|--------|-----------|------|
+| EQ | random（时间切分无 train 数据） | 0.878 | 0.935 | 0.835 | 0.920±0.019 | rapidpopdescription null rate 35.8%，全部 7 个特征正常参与训练 |
+| TC | time | 0.815（native） | 0.926 | 0.693 | 0.634±0.062 | val 只有 4 条 orange，val 指标不可信；test native 更可靠 |
+| WF | random（同 EQ） | 0.798（native） | 0.960 | 0.653 | 0.779±0.098 | orange_or_red 全球仅 44 条，极度稀少 |
+| DR | time | —（native 9条） | — | — | 0.508±0.063 | 已知弱项；native test 不足，augmented test 参考意义有限 |
+
+模型保存路径：`models/{eq,tc,wf,dr}_alertlevel_binary_classifier.pkl`
+
 ---
 
 ## Tech Stack
@@ -86,6 +158,58 @@ Final output per unique event: `event_id`, `event_type`, `event_date`, `primary_
 - **Keyword extraction**: KeyBERT (for display/analysis only, not model input)
 - **Stock data**: yfinance
 - **Environment**: Python 3.10+, conda env `gdelt`
+
+## Stage 2 Event Type Classifier — LLM Labeling Design
+
+Training data for the event type classifier is labeled via LLM (`scripts/label_event_types.py`) using DeepSeek-V3 on SiliconFlow.
+
+### Core labeling criterion
+
+An article qualifies for a disaster label **only if it is primarily reporting on a specific, real disaster event that has occurred or is currently unfolding**. This includes:
+- Breaking news and situation updates about a named event
+- Follow-up / tracking reports (situation days later)
+- Direct impact reports (evacuations, industry effects, economic damage)
+
+An article is labeled `not_related` if it is primarily:
+- **Policy/legislation**: disaster management bills, preparedness campaigns, aid budgets
+- **Scientific/analytical**: research on fault lines, climate models, long-term trend analysis
+- **Forecast only**: "a storm may develop next week" — no event has actually occurred
+- **Historical retrospective**: anniversary coverage, "ten years after the 2011 tsunami"
+- **Humanitarian/aid response**: fundraising appeals, donation campaigns, aid announcements
+- **Metaphorical or unrelated**: "flooded with complaints", sports, finance, entertainment
+- **Volcano/eruption**: not covered by the pipeline
+
+### Design rationale
+
+The distinction is not "does this article mention a disaster" but "is this article *about* a specific event happening now". Articles about disaster policy, climate science, or aid appeals mention real disasters but are not event reports — including them would contaminate the classifier with text patterns from a different register (policy/scientific language vs. news reporting). The `not_related` class represents anything a news aggregator might pull in via disaster keywords but which is not actionable event data.
+
+### Sampling strategy
+
+Uniform per-class cap of 1000 rows; volcano rows dropped before sampling. Output: `data/llm_labels/llm_labels_0_26326_s1000.csv` (gitignored).
+
+### LLM & API details
+
+- **Model**: `deepseek-ai/DeepSeek-V3` via SiliconFlow (`https://api.siliconflow.cn/v1/chat/completions`)
+- **Error handling**: HTTP 429/403 → wait 30s × (attempt+1), up to 5 retries; other exceptions → 5s × (attempt+1)
+- **Resume logic**: only skips non-error rows on restart; error rows are always retried
+- **Workers**: 2 concurrent (higher causes 403 rate-limit on SiliconFlow free tier)
+- **Output columns**: `idx`, `url`, `old_event_type`, `llm_event_type`, `reasoning`
+
+### Train/val/test split
+
+Time-based split (no random shuffling) to prevent data leakage. Script: `scripts/prepare_classifier_data.py`.
+
+| Split | Date range | Rows | Notes |
+|-------|-----------|------|-------|
+| train | ≤ 2025-04-30 | 3411 (68.2%) | |
+| val | 2025-05-01 ~ 2025-07-31 | 576 (11.5%) | cyclone scarce (24 rows) |
+| test | > 2025-07-31 | 1011 (20.2%) | |
+
+Label distribution (train): not_related=913, wildfire=576, earthquake=539, cyclone=469, drought=464, flood=450
+
+Text format: `"{title} [SEP] {text_cleaned[:512]}"` — columns: `idx`, `timestamp`, `label`, `text`.
+
+---
 
 ## Reference Implementation
 

@@ -34,9 +34,9 @@ from tqdm import tqdm
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-API_KEY = "sk-pnfnnlrdscgcemyjjhqtseekdcozuqylngsjcpenhpiqiujl"
+API_KEY = "sk-jbarivjnimgypzwvaxnzpgbccuuhsxeddhwgwliwoewhgast"
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
-MODEL   = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+MODEL   = "deepseek-ai/DeepSeek-V3"
 
 DATA_FILE  = Path(__file__).parent.parent / "data" / "training_events_gdelt.xlsx"
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "llm_labels"
@@ -44,40 +44,55 @@ OUTPUT_DIR = Path(__file__).parent.parent / "data" / "llm_labels"
 VALID_LABELS = {"earthquake", "flood", "cyclone", "wildfire", "drought", "not_related"}
 
 SYSTEM_PROMPT = (
-    "You are a news article classifier. "
-    "Classify the article into exactly one category. "
-    "Respond with ONLY the single category label — no explanation, no punctuation."
+    "You are a news article classifier for a disaster news dataset. "
+    "First write one sentence of reasoning, then output the label on a new line "
+    "in the exact format: LABEL: <category>"
 )
 
 USER_TEMPLATE = """\
-Categories:
-- earthquake : earthquakes, tremors, seismic activity, aftershocks
-- flood       : floods, flooding, flash floods, inundation
-- cyclone     : tropical cyclones, hurricanes, typhoons, tropical storms
-- wildfire    : wildfires, forest fires, bushfires
-- drought     : droughts, water shortages, dry spells
-- not_related : anything else — including volcano/eruption events, political news,
-                human-interest stories, financial articles, or articles that only
-                mention disasters briefly without being primarily about them
+We are building a dataset of news articles that report on specific, real disaster events.
+
+An article QUALIFIES if it is primarily about a specific disaster that occurred or is currently \
+unfolding — including:
+  • Breaking news / situation updates ("the earthquake struck at 6am, killing 12")
+  • Follow-up tracking ("three days on, floodwaters have reached X")
+  • Direct impact reports ("the wildfire has forced 10,000 evacuations; power grid is offline")
+
+An article does NOT qualify and should be labeled not_related if it is primarily:
+  • General/policy: disaster management policy, legislation, preparedness campaigns, aid budgets
+  • Scientific/analytical: research on fault lines, climate models, long-term drought trends
+  • Forecasts only: "a storm may develop next week" (no event has actually happened yet)
+  • Historical retrospective: anniversary coverage, "ten years after the 2011 tsunami"
+  • Humanitarian/aid response: fundraising appeals, donation campaigns, aid budget announcements
+  • Metaphorical or unrelated: "flooded with complaints", sports, finance, entertainment
+  • Volcano/eruption articles (not covered by our pipeline)
+
+Classify into one of:
+- earthquake  : a specific earthquake / tremor / seismic event occurred
+- flood       : a specific flooding / flash flood / storm surge event occurred
+- cyclone     : a specific tropical cyclone / hurricane / typhoon occurred
+- wildfire    : a specific wildfire / bushfire occurred
+- drought     : a specific drought / prolonged water shortage is affecting a region right now
+- not_related : does not meet the qualifying criteria above
 
 Title: {title}
 Text (first 400 chars): {snippet}
 
-Category:"""
+Respond with one reasoning sentence, then: LABEL: <category>"""
 
 
 # ---------------------------------------------------------------------------
 # API call
 # ---------------------------------------------------------------------------
-def call_api(title: str, snippet: str, max_retries: int = 3) -> str:
-    """Call DeepSeek via SiliconFlow. Returns one of VALID_LABELS or 'error'."""
+def call_api(title: str, snippet: str, max_retries: int = 5) -> tuple[str, str]:
+    """Call DeepSeek via SiliconFlow. Returns (label, reasoning); label is one of VALID_LABELS or 'error'."""
     payload = {
         "model": MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user",   "content": USER_TEMPLATE.format(title=title, snippet=snippet)},
         ],
-        "max_tokens": 128,
+        "max_tokens": 200,
         "temperature": 0.0,
     }
     headers = {
@@ -88,45 +103,62 @@ def call_api(title: str, snippet: str, max_retries: int = 3) -> str:
     for attempt in range(max_retries):
         try:
             resp = requests.post(API_URL, json=payload, headers=headers, timeout=60)
+            if resp.status_code in (429, 403):
+                wait = 30 * (attempt + 1)  # 30s, 60s, 90s on successive rate-limit hits
+                time.sleep(wait)
+                continue
             resp.raise_for_status()
             raw = resp.json()["choices"][0]["message"]["content"].strip()
-            return _parse_label(raw)
+            return _parse_response(raw)
         except Exception as e:
             if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)
+                time.sleep(5 * (attempt + 1))
             else:
-                return "error"
-    return "error"
+                return "error", ""
+    return "error", ""
 
 
-def _parse_label(raw: str) -> str:
-    """Extract the final answer label from model output.
+def _parse_response(raw: str) -> tuple[str, str]:
+    """Parse model output into (label, reasoning).
 
-    DeepSeek-R1-Distill outputs a reasoning paragraph followed by the answer.
-    Strategy: find the LAST occurrence of any valid label (the conclusion, not
-    the mid-reasoning mentions), with a fixed priority order to break ties.
+    Expected format:
+        <one reasoning sentence>
+        LABEL: earthquake
+
+    Falls back to searching for the last valid label in the text.
+    Returns (label, reasoning_text).
     """
-    # Strip explicit <think>…</think> blocks if present
-    cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip().lower()
+    # Strip <think>…</think> blocks
+    cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
 
-    # Exact match (ideal case — model followed instructions perfectly)
-    if cleaned in VALID_LABELS:
-        return cleaned
+    # Primary: find explicit "LABEL: <label>" line
+    label_match = re.search(r"label\s*:\s*(\w+)", cleaned, re.IGNORECASE)
+    if label_match:
+        candidate = label_match.group(1).lower().strip()
+        if candidate in VALID_LABELS:
+            reasoning = cleaned[:label_match.start()].strip()
+            return candidate, reasoning
 
-    # Fixed-order label list (most specific first to avoid partial matches)
+    # Fallback: find LAST occurrence of a valid label (conclusion > mid-reasoning)
+    lower = cleaned.lower()
     ordered = ["not_related", "earthquake", "wildfire", "cyclone", "flood", "drought"]
-
-    # Find the LAST position of each label in the text; pick the one that appears latest
     last_pos: dict[str, int] = {}
     for label in ordered:
-        pos = cleaned.rfind(label)
+        pos = lower.rfind(label)
         if pos != -1:
             last_pos[label] = pos
 
     if last_pos:
-        return max(last_pos, key=last_pos.__getitem__)
+        best = max(last_pos, key=last_pos.__getitem__)
+        return best, cleaned
 
-    return "error"
+    return "error", cleaned
+
+
+def _parse_label(raw: str) -> str:
+    """Convenience wrapper returning just the label."""
+    label, _ = _parse_response(raw)
+    return label
 
 
 # ---------------------------------------------------------------------------
@@ -159,12 +191,13 @@ def label_range(start: int, end: int, workers: int, sample: int | None = None) -
     out_file = OUTPUT_DIR / f"llm_labels_{tag}.csv"
     print(f"Rows {start}–{end-1} ({len(df)} rows). Output → {out_file}")
 
-    # Resume: skip already-labeled rows
+    # Resume: skip already-labeled rows (ignore error rows so they get retried)
     done: dict[int, str] = {}
     if out_file.exists():
         prev = pd.read_csv(out_file)
-        done = dict(zip(prev["idx"], prev["llm_event_type"]))
-        print(f"Resuming: {len(done)} rows already labeled.")
+        prev_ok = prev[prev["llm_event_type"] != "error"]
+        done = dict(zip(prev_ok["idx"], prev_ok["llm_event_type"]))
+        print(f"Resuming: {len(done)} rows already labeled ({len(prev)-len(done)} errors will be retried).")
 
     rows_to_do = [(idx, row) for idx, row in df.iterrows() if idx not in done]
     print(f"Remaining: {len(rows_to_do)} rows to label.")
@@ -173,7 +206,7 @@ def label_range(start: int, end: int, workers: int, sample: int | None = None) -
         print("Nothing to do.")
         return
 
-    results: list[dict] = [{"idx": k, "url": "", "old_event_type": "", "llm_event_type": v}
+    results: list[dict] = [{"idx": k, "url": "", "old_event_type": "", "llm_event_type": v, "reasoning": ""}
                            for k, v in done.items()]
     lock = __import__("threading").Lock()
 
@@ -182,10 +215,11 @@ def label_range(start: int, end: int, workers: int, sample: int | None = None) -
         title   = str(row.get("title", "") or "")
         text    = str(row.get("text_cleaned", "") or "")
         snippet = text[:400]
-        label   = call_api(title, snippet)
+        label, reasoning = call_api(title, snippet)
         return {"idx": idx, "url": str(row.get("url", "")),
                 "old_event_type": str(row.get("event_type", "")),
-                "llm_event_type": label}
+                "llm_event_type": label,
+                "reasoning": reasoning}
 
     checkpoint_every = 50
     with tqdm(total=len(rows_to_do), desc=f"Labeling [{start}:{end}]", unit="row") as pbar:

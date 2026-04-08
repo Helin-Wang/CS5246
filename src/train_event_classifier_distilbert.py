@@ -133,13 +133,11 @@ def main():
     args = parser.parse_args()
 
     # Device
-    if torch.backends.mps.is_available():
-        device = "mps"
-    elif torch.cuda.is_available():
+    if torch.cuda.is_available():
         device = "cuda"
     else:
         device = "cpu"
-    print(f"Device: {device}")
+    print(f"Device: {device}  ({torch.cuda.get_device_name(0) if device == 'cuda' else 'CPU'})")
 
     # Load data
     print("Loading splits...")
@@ -186,7 +184,7 @@ def main():
         metric_for_best_model="macro_f1",
         greater_is_better=True,
         logging_steps=50,
-        fp16=False,        # MPS does not support fp16
+        fp16=torch.cuda.is_available(),   # enable on GPU, off on CPU
         report_to="none",
         save_total_limit=2,
     )

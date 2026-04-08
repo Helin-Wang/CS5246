@@ -1,6 +1,5 @@
 # Generated / large files
 data/llm_labels/
-data/splits/
 data/models/
 models/
 logs/

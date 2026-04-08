@@ -24,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 ROOT       = Path(__file__).parent.parent
-LABELS     = ROOT / "data" / "llm_labels" / "llm_labels_0_26326_s2000.csv"
+LABELS     = ROOT / "data" / "llm_labels" / "llm_labels_0_26326_s1000.csv"
 ORIG       = ROOT / "data" / "training_events_gdelt.xlsx"
 SPLITS_DIR = ROOT / "data" / "splits"
 

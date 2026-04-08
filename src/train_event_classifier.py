@@ -61,7 +61,7 @@ def baseline_evaluate(split_name: str) -> None:
     # old_event_type acts as the "before LLM" prediction; not_related rows
     # are always wrong since V1THEMES has no such class.
     labels_df = pd.read_csv(
-        ROOT / "data" / "llm_labels" / "llm_labels_0_26326_s2000.csv")
+        ROOT / "data" / "llm_labels" / "llm_labels_0_26326_s1000.csv")
     df2 = df.merge(
         labels_df[["idx", "old_event_type"]],
         left_on=df.index, right_on=labels_df.index, how="left")
