@@ -1,0 +1,175 @@
+{
+  "_comment": "Static knowledge base mapping ISO-3166-1 alpha-2 country codes to stock market index tickers and key industries affected by natural disasters. Covers ~40 countries most frequently affected by major disasters.",
+  "US": {
+    "index_ticker": "SPY",
+    "key_industries": ["insurance", "construction", "utilities", "agriculture", "energy"]
+  },
+  "JP": {
+    "index_ticker": "EWJ",
+    "key_industries": ["insurance", "construction", "automotive", "electronics", "utilities"]
+  },
+  "CN": {
+    "index_ticker": "FXI",
+    "key_industries": ["agriculture", "construction", "coal", "insurance", "tourism"]
+  },
+  "IN": {
+    "index_ticker": "INDA",
+    "key_industries": ["agriculture", "insurance", "infrastructure", "power", "tourism"]
+  },
+  "AU": {
+    "index_ticker": "EWA",
+    "key_industries": ["agriculture", "mining", "insurance", "tourism", "utilities"]
+  },
+  "ID": {
+    "index_ticker": "IDX",
+    "key_industries": ["palm_oil", "mining", "tourism", "agriculture", "insurance"]
+  },
+  "PH": {
+    "index_ticker": "EPHE",
+    "key_industries": ["agriculture", "tourism", "insurance", "utilities", "construction"]
+  },
+  "BD": {
+    "index_ticker": "^DSEX",
+    "key_industries": ["garment", "agriculture", "insurance", "shipping"]
+  },
+  "PK": {
+    "index_ticker": "^KSE",
+    "key_industries": ["agriculture", "textiles", "insurance", "construction"]
+  },
+  "NP": {
+    "index_ticker": "^NEPSE",
+    "key_industries": ["tourism", "hydropower", "agriculture", "insurance"]
+  },
+  "TR": {
+    "index_ticker": "TUR",
+    "key_industries": ["construction", "insurance", "tourism", "agriculture", "textiles"]
+  },
+  "MX": {
+    "index_ticker": "EWW",
+    "key_industries": ["agriculture", "tourism", "oil", "insurance", "construction"]
+  },
+  "BR": {
+    "index_ticker": "EWZ",
+    "key_industries": ["agriculture", "mining", "insurance", "utilities", "construction"]
+  },
+  "CL": {
+    "index_ticker": "ECH",
+    "key_industries": ["copper_mining", "agriculture", "insurance", "utilities"]
+  },
+  "CO": {
+    "index_ticker": "GXG",
+    "key_industries": ["oil", "coffee", "insurance", "agriculture", "utilities"]
+  },
+  "PE": {
+    "index_ticker": "EPU",
+    "key_industries": ["copper_mining", "agriculture", "insurance", "fishing"]
+  },
+  "TH": {
+    "index_ticker": "THD",
+    "key_industries": ["tourism", "agriculture", "electronics", "insurance", "automotive"]
+  },
+  "VN": {
+    "index_ticker": "VNM",
+    "key_industries": ["agriculture", "textiles", "insurance", "construction", "tourism"]
+  },
+  "MY": {
+    "index_ticker": "EWM",
+    "key_industries": ["palm_oil", "rubber", "electronics", "insurance", "tourism"]
+  },
+  "MM": {
+    "index_ticker": "^MICK",
+    "key_industries": ["agriculture", "gas", "mining", "textiles"]
+  },
+  "KH": {
+    "index_ticker": "^CSX",
+    "key_industries": ["agriculture", "garment", "tourism", "construction"]
+  },
+  "ET": {
+    "index_ticker": "^ESX",
+    "key_industries": ["agriculture", "coffee", "construction"]
+  },
+  "MZ": {
+    "index_ticker": "^BMVM",
+    "key_industries": ["agriculture", "gas", "mining"]
+  },
+  "ZW": {
+    "index_ticker": "^ZSE",
+    "key_industries": ["agriculture", "mining", "tourism"]
+  },
+  "KE": {
+    "index_ticker": "^NSE",
+    "key_industries": ["agriculture", "tourism", "telecom", "insurance"]
+  },
+  "NG": {
+    "index_ticker": "^NGX",
+    "key_industries": ["oil", "agriculture", "insurance", "telecom"]
+  },
+  "PG": {
+    "index_ticker": "^PNGX",
+    "key_industries": ["mining", "agriculture", "oil"]
+  },
+  "FJ": {
+    "index_ticker": "^SPX",
+    "key_industries": ["tourism", "sugar", "agriculture"]
+  },
+  "VU": {
+    "index_ticker": "^VX",
+    "key_industries": ["tourism", "agriculture"]
+  },
+  "SB": {
+    "index_ticker": "^SPXW",
+    "key_industries": ["logging", "agriculture", "fishing"]
+  },
+  "MG": {
+    "index_ticker": "^BMVM",
+    "key_industries": ["agriculture", "mining", "tourism"]
+  },
+  "HT": {
+    "index_ticker": "^SPXW",
+    "key_industries": ["agriculture", "textiles", "remittances"]
+  },
+  "IR": {
+    "index_ticker": "^TEPIX",
+    "key_industries": ["oil", "agriculture", "insurance", "construction"]
+  },
+  "IQ": {
+    "index_ticker": "^ISX60",
+    "key_industries": ["oil", "agriculture", "construction"]
+  },
+  "AF": {
+    "index_ticker": "^SPXW",
+    "key_industries": ["agriculture", "mining"]
+  },
+  "NZ": {
+    "index_ticker": "ENZL",
+    "key_industries": ["agriculture", "tourism", "insurance", "construction"]
+  },
+  "GR": {
+    "index_ticker": "GREK",
+    "key_industries": ["tourism", "agriculture", "shipping", "insurance"]
+  },
+  "IT": {
+    "index_ticker": "EWI",
+    "key_industries": ["tourism", "agriculture", "insurance", "construction", "automotive"]
+  },
+  "DE": {
+    "index_ticker": "EWG",
+    "key_industries": ["insurance", "automotive", "chemicals", "agriculture", "utilities"]
+  },
+  "FR": {
+    "index_ticker": "EWQ",
+    "key_industries": ["insurance", "agriculture", "tourism", "utilities", "aerospace"]
+  },
+  "GB": {
+    "index_ticker": "EWU",
+    "key_industries": ["insurance", "utilities", "construction", "agriculture", "financial"]
+  },
+  "CA": {
+    "index_ticker": "EWC",
+    "key_industries": ["oil", "agriculture", "mining", "insurance", "forestry"]
+  },
+  "MX": {
+    "index_ticker": "EWW",
+    "key_industries": ["agriculture", "tourism", "oil", "insurance", "construction"]
+  }
+}

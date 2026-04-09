@@ -1,0 +1,14 @@
+{
+  "_comment": "Maps sector labels to representative US-listed ETFs. Used by entity_linker to select tickers for Module E stock analysis.",
+  "insurance":      "IAK",
+  "agriculture":    "MOO",
+  "energy":         "XLE",
+  "utilities":      "XLU",
+  "construction":   "XHB",
+  "tourism":        "JETS",
+  "timber":         "WOOD",
+  "mining":         "XME",
+  "manufacturing":  "XLI",
+  "shipping":       "BOAT",
+  "financial":      "XLF"
+}

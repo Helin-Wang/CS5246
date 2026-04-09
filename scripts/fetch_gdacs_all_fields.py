@@ -1,12 +1,13 @@
 """
 Unified GDACS fetcher for severity training data.
 
-This script fetches EQ/TC/WF/DR events from GDACS API in one run, enriches
+This script fetches EQ/TC/WF/DR/FL events from GDACS API in one run, enriches
 type-specific fields (including detail endpoint extraction), and saves a
 single merged CSV file.
 
 Notes:
-- Flood (FL) rule-check logic is intentionally excluded.
+- FL (Flood) is now supported. Fields extracted: dead, displaced (from
+  severitydata), plus alertlevel/country/dates for matching.
 - Volcano (VO) is not supported.
 """
 
@@ -35,7 +36,7 @@ REQUEST_HEADERS = {
     )
 }
 
-SUPPORTED_TYPES = ("EQ", "TC", "WF", "DR")
+SUPPORTED_TYPES = ("EQ", "TC", "WF", "DR", "FL")
 DEFAULT_ALERT_LEVELS = "green;orange;red"
 
 CSV_FIELDS = [
@@ -56,6 +57,8 @@ CSV_FIELDS = [
     "people_affected",
     "affected_area_km2",
     "affected_country_count",
+    "dead",
+    "displaced",
     "severity_level",
     "severity_text",
 ]
@@ -232,6 +235,23 @@ def parse_api_features(doc: Dict, event_type: str):
         # WF duration can be computed from list payload dates.
         if event_type == "WF":
             row["duration_days"] = compute_duration_days(row["fromdate"], row["todate"])
+
+        # FL: extract dead/displaced from severitydata in list payload.
+        if event_type == "FL":
+            severity = p.get("severitydata", {}) if isinstance(p.get("severitydata"), dict) else {}
+            severity_text = str(severity.get("severitytext", "")).strip()
+            row["severity_text"] = severity_text
+            row["severity_level"] = parse_severity_level(severity_text)
+            # GDACS FL severitydata may contain humanimpact with dead/displaced
+            human = p.get("humanimpact", {}) if isinstance(p.get("humanimpact"), dict) else {}
+            dead = _safe_int(human.get("dead") or human.get("killed") or severity.get("dead"))
+            displaced = _safe_int(
+                human.get("displaced") or human.get("homeless") or severity.get("displaced")
+            )
+            if dead is not None:
+                row["dead"] = dead
+            if displaced is not None:
+                row["displaced"] = displaced
 
         rows.append(row)
     return rows
@@ -526,7 +546,7 @@ def main():
         "--event-types",
         type=str,
         default="EQ,TC,WF,DR",
-        help="Comma-separated event types. Supported: EQ,TC,WF,DR.",
+        help="Comma-separated event types. Supported: EQ,TC,WF,DR,FL.",
     )
     parser.add_argument(
         "--fromdate",
@@ -563,6 +583,14 @@ def main():
         type=int,
         default=5000,
         help="Max rows scanned per type-level before dedupe/capping.",
+    )
+    parser.add_argument(
+        "--skip-enrich",
+        action="store_true",
+        help="Skip per-event detail enrichment (geteventdata endpoint). "
+             "Use when doing a full/bulk pull — the detail endpoint is fragile "
+             "under high request volume. List fields (alertlevel, country, date) "
+             "are sufficient for GDACS matching.",
     )
     parser.add_argument(
         "--workers",
@@ -634,8 +662,13 @@ def main():
                 balanced_per_level=args.balanced_per_level,
                 page_cap=args.page_cap,
             )
-            workers = args.tc_workers if event_type == "TC" else args.workers
-            rows = enrich_rows_with_details(rows, workers=max(1, workers))
+            if not args.skip_enrich:
+                workers = args.tc_workers if event_type == "TC" else args.workers
+                rows = enrich_rows_with_details(rows, workers=max(1, workers))
+            else:
+                # Strip internal _details_url column added during list fetch
+                for r in rows:
+                    r.pop("_details_url", None)
             merged_rows.extend(rows)
             print(f"[info] {event_type}: collected {len(rows)} rows")
 
