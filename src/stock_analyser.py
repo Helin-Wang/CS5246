@@ -261,7 +261,12 @@ class StockAnalyser:
         Compute CAR for a single event dict using one ticker.
         Kept for backwards compatibility; prefer compute_car_multi_event.
         """
-        ticker = event.get("index_ticker") or (event.get("sector_etfs") or [None])[0]
+        import ast
+        raw = event.get("sector_etfs") or []
+        if isinstance(raw, str):
+            try: raw = ast.literal_eval(raw)
+            except Exception: raw = []
+        ticker = event.get("index_ticker") or (raw[0] if raw else None)
         return compute_car(
             event_date   = event.get("event_date", ""),
             ticker       = ticker or "",
@@ -276,10 +281,23 @@ class StockAnalyser:
         Uses event['sector_etfs'] (list from EntityLinker).
         Returns one row per (event_id, sector, ticker).
         """
+        import ast
         event_id   = str(event.get("event_id", ""))
         event_date = event.get("event_date", "")
-        etfs       = event.get("sector_etfs") or []
-        industries = event.get("key_industries") or []
+        raw_etfs   = event.get("sector_etfs") or []
+        raw_ind    = event.get("key_industries") or []
+        if isinstance(raw_etfs, str):
+            try:
+                raw_etfs = ast.literal_eval(raw_etfs)
+            except Exception:
+                raw_etfs = []
+        if isinstance(raw_ind, str):
+            try:
+                raw_ind = ast.literal_eval(raw_ind)
+            except Exception:
+                raw_ind = []
+        etfs       = raw_etfs if isinstance(raw_etfs, list) else []
+        industries = raw_ind  if isinstance(raw_ind,  list) else []
 
         results = []
         for i, ticker in enumerate(etfs):
