@@ -306,4 +306,24 @@ Volcano is explicitly excluded (no wind-effect feature → no model). DR classif
 
 ### Module E（Stock Analysis）
 
-待 SLURM job 完成后补充。结果文件：`data/results/car_results.csv`、`data/results/group_analysis.csv`。
+SLURM job 562032，NUS HPC xcnd14 节点。修复了 `sector_etfs` 从 CSV 读回时字符串未解析为 list 的 bug（`ast.literal_eval`）。
+
+| 指标 | 值 |
+|------|-----|
+| CAR 计算行数 | 5161（1622 unique events × avg 3.2 tickers）|
+| 成功率 | 5155/5161 (99.9%) |
+| 失败原因 | ACWI 在 2000 年前无历史数据（正常限制） |
+| Group analysis 行数 | 354 |
+| **统计显著结果（p<0.05）** | **25 个** |
+
+**主要显著发现**（节选）：
+
+| 灾种 | 严重性 | 行业 | 窗口 | n | mean_CAR | p |
+|------|--------|------|------|---|----------|---|
+| WF | orange_or_red | insurance | T+3 | 71 | +0.64% | 0.0006 |
+| DR | green | agriculture | T+5 | 208 | -0.39% | 0.0007 |
+| FL | green | construction | T+1 | 435 | -0.21% | 0.0014 |
+| WF | orange_or_red | insurance | T+5 | 71 | +0.69% | 0.0041 |
+| EQ | orange_or_red | agriculture | T+1 | 43 | -0.25% | 0.0181 |
+
+结果文件：`data/results/car_results.csv`（5161行）、`data/results/group_analysis.csv`（354行）。
