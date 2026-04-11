@@ -5,7 +5,7 @@ and save per-sample predictions.
 Usage:
     python src/eval_event_classifier.py
     python src/eval_event_classifier.py --split val
-    python src/eval_event_classifier.py --ckpt models/event_classifier_distilbert/checkpoint-270
+    python src/eval_event_classifier.py --ckpt models/event_classifier_distilbert/checkpoint-890
 """
 
 import argparse

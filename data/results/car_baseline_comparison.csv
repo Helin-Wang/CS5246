@@ -1,0 +1,4 @@
+window,event_mean,event_std,event_n,random_mean,random_std,random_n,p_event_vs_zero,p_random_vs_zero,p_event_vs_random,event_sig_5pct,random_sig_5pct,diff_sig_5pct
+car_t1,0.000468,0.011179,1238,-0.000317,0.009447,1238,0.1412,0.2377,0.0593,False,False,False
+car_t3,0.001575,0.017993,1238,-0.001131,0.017568,1238,0.0021,0.0237,0.0002,True,True,True
+car_t5,0.002033,0.023878,1238,0.001178,0.022661,1238,0.0028,0.0677,0.3615,True,False,False

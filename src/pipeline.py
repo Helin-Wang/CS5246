@@ -89,6 +89,7 @@ def run_pipeline(
     max_rows: int = 0,
     skip_stock: bool = False,
     verbose: bool = False,
+    output_dir: str = "",
 ) -> None:
     from location_extractor import extract_location
     from time_extractor import extract_event_time
@@ -226,8 +227,8 @@ def run_pipeline(
                     title, body = raw_text.split(" [SEP] ", 1)
                 else:
                     title, body = "", raw_text
-                body_trunc = body[:TEXT_LIMIT]
-                text_trunc = f"{title} [SEP] {body_trunc}" if title else body_trunc
+                # NER uses full body text (no truncation); TEXT_LIMIT only applies to Module A
+                text_trunc = f"{title} [SEP] {body}" if title else body
 
                 ner = _extract_ner(text_trunc, cluster["event_type"], extractor)
                 all_low_conf.append(ner.get("low_confidence", True))
@@ -266,6 +267,11 @@ def run_pipeline(
           f"({100*gdacs_hits/len(events):.1f}% GDACS coverage)")
 
     # ── Module B: entity linking ───────────────────────────────────────────────
+    # Clusterer outputs "primary_country"; entity_linker reads "country_iso2" — bridge the gap.
+    for ev in events:
+        if ev.get("primary_country") and not ev.get("country_iso2"):
+            ev["country_iso2"] = ev["primary_country"]
+
     idx_to_text = {idx: str(r.get("text", "")) for idx, r in idx_to_row.items()}
     for ev in events:
         ev["article_texts"] = [
@@ -286,9 +292,10 @@ def run_pipeline(
     print(f"Module B complete: {linked}/{len(events)} events have sector ETFs")
 
     # Save events
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(output_dir) if output_dir else RESULTS_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
     events_df  = pd.DataFrame(events)
-    events_path = RESULTS_DIR / "events.csv"
+    events_path = out_dir / "events.csv"
     events_df.to_csv(events_path, index=False)
     print(f"Events saved → {events_path}")
 
@@ -305,13 +312,13 @@ def run_pipeline(
 
     if tradeable:
         car_df   = analyser.compute_car_batch(tradeable)
-        car_path = RESULTS_DIR / "car_results.csv"
+        car_path = out_dir / "car_results.csv"
         car_df.to_csv(car_path, index=False)
         print(f"CAR results saved → {car_path}  "
               f"(success: {car_df['error'].isna().sum()}/{len(car_df)})")
 
         group_df   = analyser.group_analysis(car_df, events_df)
-        group_path = RESULTS_DIR / "group_analysis.csv"
+        group_path = out_dir / "group_analysis.csv"
         group_df.to_csv(group_path, index=False)
         print(f"Group analysis saved → {group_path}")
         print("\nGroup-level CAR summary:")
@@ -328,6 +335,8 @@ if __name__ == "__main__":
                         help="Process only first N rows (0 = all)")
     parser.add_argument("--skip-stock", action="store_true",
                         help="Skip Module E (stock analysis)")
+    parser.add_argument("--output-dir", default="",
+                        help="Output directory for results (default: data/results/)")
     parser.add_argument("--verbose",    action="store_true")
     args = parser.parse_args()
 
@@ -336,4 +345,5 @@ if __name__ == "__main__":
         max_rows   = args.max_rows,
         skip_stock = args.skip_stock,
         verbose    = args.verbose,
+        output_dir = args.output_dir,
     )

@@ -15,7 +15,7 @@ If multiple GDACS rows qualify, the one with the smallest date gap is chosen.
 
 Usage:
     from src.gdacs_matcher import GDACSmatcher
-    matcher = GDACSmatcher()          # loads data/gdacs_all_fields_v2.csv
+    matcher = GDACSmatcher()          # loads data/gdacs_all_fields.csv
     result  = matcher.match(cluster)  # cluster dict from EventClusterer
     # result is None  →  no GDACS match
     # result is dict  →  {alertlevel, magnitude, wind_speed_kmh, …, gdacs_matched: True}
@@ -30,7 +30,7 @@ from typing import Dict, Optional
 import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_GDACS_CSV = BASE_DIR / "data" / "gdacs_all_fields_v2.csv"
+DEFAULT_GDACS_CSV = BASE_DIR / "data" / "gdacs_all_fields.csv"
 
 DATE_TOLERANCE_DAYS = 7
 
@@ -74,7 +74,7 @@ class GDACSmatcher:
 
     Parameters
     ----------
-    gdacs_csv : path to GDACS CSV (default: data/gdacs_all_fields_v2.csv)
+    gdacs_csv : path to GDACS CSV (default: data/gdacs_all_fields.csv)
     date_tolerance : max days between cluster event_date and GDACS fromdate
     """
 

@@ -25,3 +25,4 @@ The deliverable must include an **evaluation** section that makes results verifi
 - **Results** in a clear form (tables or figures) and a short **analysis** of errors/limitations.
 
 Adjust metrics and protocols to match your exact pipeline; the requirement is that evaluation is explicit, reproducible in description, and tied to your claims.
+

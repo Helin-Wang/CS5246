@@ -42,7 +42,7 @@ python -u scripts/eval_gdacs_matching.py \
     --events data/results/events.csv \
     --test-csv data/splits/test.csv \
     --loc-labels data/llm_labels/location_labels_test.csv \
-    --gdacs-csv data/gdacs_all_fields_v2.csv \
+    --gdacs-csv data/gdacs_all_fields.csv \
     --out data/results/gdacs_match_eval.csv
 
 echo "=============================="

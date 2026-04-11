@@ -1,0 +1,358 @@
+gdacs_eventid,event_type,alertlevel,country,country_iso2,gdacs_date,n_matching_clusters,found,over_split,matching_cluster_ids
+1511252,EQ,orange,Bangladesh,BD,2025-11-21,3,True,True,EQ_1445;EQ_1446;EQ_1447
+1507329,EQ,orange,Türkiye,TR,2025-10-27,2,True,True,EQ_0692;EQ_1091
+1504796,EQ,orange,Philippines,PH,2025-10-12,3,True,True,EQ_1392;EQ_1393;EQ_1394
+1504616,EQ,orange,Ethiopia,ET,2025-10-11,0,False,False,
+1504268,EQ,orange,Philippines,PH,2025-10-10,3,True,True,EQ_1392;EQ_1393;EQ_1394
+1504188,EQ,orange,China,CN,2025-10-09,0,False,False,
+1502713,EQ,orange,Philippines,PH,2025-09-30,5,True,True,EQ_1388;EQ_1389;EQ_1390;EQ_1391;EQ_1392
+1501948,EQ,orange,Venezuela,VE,2025-09-25,1,True,False,EQ_1407
+1501915,EQ,orange,Venezuela,VE,2025-09-24,1,True,False,EQ_1407
+1500811,EQ,orange,Russia,,2025-09-18,0,False,False,
+1500178,EQ,orange,India,IN,2025-09-14,7,True,True,EQ_1064;EQ_1065;EQ_1066;EQ_1067;EQ_1068;EQ_1069;EQ_1070
+1499045,EQ,orange,Afghanistan,AF,2025-09-05,2,True,True,EQ_1106;EQ_1107
+1494848,EQ,orange,Türkiye,TR,2025-08-10,3,True,True,EQ_0672;EQ_1086;EQ_1087
+1508467,EQ,red,Afghanistan,AF,2025-11-02,1,True,False,EQ_1111
+1498907,EQ,red,Afghanistan,AF,2025-09-04,2,True,True,EQ_1106;EQ_1107
+1498339,EQ,red,Afghanistan,AF,2025-08-31,2,True,True,EQ_1105;EQ_1106
+1496100,EQ,red,Indonesia,ID,2025-08-16,2,True,True,EQ_0815;EQ_0816
+1024622,WF,orange,Spain,ES,2025-08-14,3,True,True,WF_0834;WF_0835;WF_0836
+1024571,WF,orange,Spain,ES,2025-08-13,3,True,True,WF_0834;WF_0835;WF_0836
+1024588,WF,orange,Portugal,PT,2025-08-10,1,True,False,WF_0725
+1024558,WF,orange,Spain,ES,2025-08-08,3,True,True,WF_0833;WF_0834;WF_0835
+1024608,WF,orange,Spain,ES,2025-08-15,3,True,True,WF_0834;WF_0835;WF_0836
+1024568,WF,orange,Greece,GR,2025-08-12,2,True,True,WF_0809;WF_0810
+1024555,WF,orange,Montenegro,ME,2025-08-10,0,False,False,
+1024567,WF,orange,Greece,GR,2025-08-12,2,True,True,WF_0809;WF_0810
+1024500,WF,orange,France,FR,2025-08-06,3,True,True,WF_0841;WF_0842;WF_0843
+1018093,DR,green,"Canada, Mexico, United States",,2025-08-21,0,False,False,
+1018196,DR,green,Venezuela,VE,2025-09-21,0,False,False,
+1018299,DR,green,Peru,PE,2025-11-21,0,False,False,
+1018332,DR,green,"Austria, Belarus, Czech Republic, Germany, Denmark, Estonia, Lithuania, Latvia, Netherlands, Poland, Russia, Sweden, Slovakia, Ukraine",,2025-12-21,0,False,False,
+1018228,DR,green,China,CN,2025-10-21,0,False,False,
+1018094,DR,green,"Algeria, Morocco",,2025-08-21,0,False,False,
+1018327,DR,orange,"Argentina, Uruguay",,2025-11-21,0,False,False,
+1001243,TC,green,Cocos (Keeling) Islands,CC,2025-12-18,0,False,False,
+1001244,TC,green,Australia,AU,2025-12-28,0,False,False,
+1001241,TC,green,,,2025-12-11,0,False,False,
+1001242,TC,green,,,2025-12-14,0,False,False,
+1001240,TC,green,,,2025-12-05,0,False,False,
+1001236,TC,green,"Viet Nam, Philippines",,2025-11-24,0,False,False,
+1001239,TC,green,,,2025-11-28,0,False,False,
+1001238,TC,orange,"Sri Lanka, India",,2025-11-27,0,False,False,
+1001237,TC,green,"Indonesia, Malaysia",,2025-11-25,0,False,False,
+1001235,TC,green,Australia,AU,2025-11-18,3,True,True,TC_1520;TC_1521;TC_1522
+1001234,TC,red,"Philippines, China, Japan",,2025-11-04,0,False,False,
+1001233,TC,red,"Viet Nam, Cambodia, Philippines, Laos",,2025-11-01,0,False,False,
+1001230,TC,red,"Jamaica, Cuba, Bahamas, Bermuda, Haiti, Canada",,2025-10-21,0,False,False,
+1001231,TC,green,,,2025-10-24,0,False,False,
+1001232,TC,orange,India,IN,2025-10-26,5,True,True,TC_1425;TC_1426;TC_1427;TC_1428;TC_1429
+1001228,TC,green,British Indian Ocean Territory,IO,2025-10-18,0,False,False,
+1001229,TC,orange,"Viet Nam, China, Cambodia, Philippines, Laos, Thailand",,2025-10-18,0,False,False,
+1001227,TC,green,,,2025-10-13,0,False,False,
+1001224,TC,green,Japan,JP,2025-10-08,0,False,False,
+1001225,TC,green,Mexico,MX,2025-10-09,0,False,False,
+1001223,TC,green,"Antigua and Barbuda, Montserrat, Anguilla, Virgin Islands  British, Virgin Islands  U.S., Saint Kitts and Nevis, Guadeloupe, Dominica, Martinique",,2025-10-07,0,False,False,
+1001222,TC,green,Mexico,MX,2025-10-04,0,False,False,
+1001226,TC,green,,,2025-10-10,0,False,False,
+1001221,TC,green,Japan,JP,2025-10-04,0,False,False,
+1001217,TC,green,,,2025-09-30,0,False,False,
+1001220,TC,green,,,2025-10-03,0,False,False,
+1001219,TC,red,"China, Viet Nam, Philippines",,2025-10-01,0,False,False,
+1001216,TC,green,"Bermuda, Bahamas, Cuba",,2025-09-26,0,False,False,
+1001218,TC,orange,India,IN,2025-10-01,0,False,False,
+1001215,TC,green,Bermuda,BM,2025-09-24,0,False,False,
+1001213,TC,green,,,2025-09-21,0,False,False,
+1001212,TC,green,,,2025-09-18,0,False,False,
+1001214,TC,red,"Viet Nam, Philippines, Laos",,2025-09-23,0,False,False,
+1001210,TC,green,"Portugal, Spain",,2025-09-17,0,False,False,
+1001211,TC,red,"Philippines, China",,2025-09-18,0,False,False,
+1001209,TC,green,"Philippines, China",,2025-09-16,0,False,False,
+1001208,TC,green,Mexico,MX,2025-09-11,0,False,False,
+1001207,TC,green,,,2025-09-09,0,False,False,
+1001203,TC,green,United States,US,2025-08-31,2,True,True,TC_1019;TC_1020
+1001206,TC,orange,China,CN,2025-09-06,0,False,False,
+1001205,TC,green,Japan,JP,2025-09-03,0,False,False,
+1001204,TC,green,,,2025-09-02,0,False,False,
+1001202,TC,green,"Viet Nam, China, Laos, Thailand",,2025-08-28,0,False,False,
+1001200,TC,green,,,2025-08-23,0,False,False,
+1001201,TC,green,,,2025-08-24,0,False,False,
+1001199,TC,red,"China, Viet Nam, Laos",,2025-08-22,0,False,False,
+1001196,TC,green,"Puerto Rico, Dominican Republic, Turks and Caicos Islands, Virgin Islands  British, United States, Bahamas, Canada, Saint Pierre and Miquelon, Bermuda, Anguilla, Virgin Islands  U.S., Iceland, Ireland, United Kingdom, Faroe Islands",,2025-08-11,0,False,False,
+1001198,TC,green,Japan,JP,2025-08-19,0,False,False,
+1001197,TC,green,Viet Nam,VN,2025-08-18,1,True,False,TC_0895
+1001194,TC,orange,"Taiwan, China",,2025-08-07,0,False,False,
+1001191,TC,green,,,2025-08-04,0,False,False,
+1001193,TC,green,,,2025-08-06,0,False,False,
+1001195,TC,green,,,2025-08-07,0,False,False,
+1001189,TC,green,,,2025-08-04,0,False,False,
+1001192,TC,green,,,2025-08-06,0,False,False,
+1001188,TC,green,Japan,JP,2025-08-02,0,False,False,
+1001190,TC,green,,,2025-08-04,0,False,False,
+1103721,FL,green,Indonesia,ID,2025-12-30,1,True,False,FL_1382
+1103694,FL,orange,Mozambique,MZ,2025-12-22,0,False,False,
+1103670,FL,green,Brazil,BR,2025-12-10,0,False,False,
+1103693,FL,green,Tanzania,TZ,2025-12-28,0,False,False,
+1103681,FL,green,Spain,ES,2025-12-27,1,True,False,FL_1350
+1103633,FL,orange,Indonesia,ID,2025-11-17,2,True,True,FL_1373;FL_1374
+1103688,FL,green,Afghanistan,AF,2025-12-30,0,False,False,
+1103686,FL,green,Peru,PE,2025-12-28,0,False,False,
+1103683,FL,green,Australia,AU,2025-12-28,1,True,False,FL_0965
+1103675,FL,green,Argentina,AR,2025-12-20,0,False,False,
+1103682,FL,green,Jordan,JO,2025-12-27,0,False,False,
+1103695,FL,green,Burundi,BI,2025-12-27,0,False,False,
+1103690,FL,green,Islamic Republic of Iran,IR,2025-12-26,0,False,False,
+1103679,FL,green,Colombia,CO,2025-12-24,0,False,False,
+1103680,FL,green,Iraq,IQ,2025-12-26,0,False,False,
+1103677,FL,green,Italy,IT,2025-12-24,0,False,False,
+1103684,FL,green,Zambia,ZM,2025-12-24,0,False,False,
+1103685,FL,green,Malaysia,MY,2025-12-24,0,False,False,
+1103669,FL,green,Mexico,MX,2025-12-11,0,False,False,
+1103725,FL,green,Indonesia,ID,2025-12-08,1,True,False,FL_1378
+1103668,FL,green,Morocco,MA,2025-12-13,2,True,True,FL_1533;FL_1534
+1103678,FL,green,Israel,IL,2025-12-23,1,True,False,FL_1504
+1103657,FL,green,United States,US,2025-12-09,12,True,True,FL_0520;FL_0521;FL_0522;FL_0523;FL_0524;FL_0525;FL_0526;FL_0527;FL_0528;FL_0529;FL_0530;FL_0531
+1103664,FL,green,Bolivia,BO,2025-12-13,0,False,False,
+1103691,FL,green,Malawi,MW,2025-12-22,0,False,False,
+1103674,FL,green,South Africa,ZA,2025-12-21,0,False,False,
+1103671,FL,green,France,FR,2025-12-15,0,False,False,
+1103687,FL,green,Papua New Guinea,PG,2025-12-20,0,False,False,
+1103672,FL,green,Algeria,DZ,2025-12-17,0,False,False,
+1103676,FL,green,Brazil,BR,2025-12-08,0,False,False,
+1103666,FL,green,Spain,ES,2025-12-12,0,False,False,
+1103660,FL,green,Democratic Republic of Congo,,2025-12-10,0,False,False,
+1103667,FL,green,Cuba,CU,2025-12-13,0,False,False,
+1103665,FL,green,Paraguay,PY,2025-12-12,0,False,False,
+1103661,FL,green,"Ireland, United Kingdom",,2025-12-09,0,False,False,
+1103662,FL,green,Israel,IL,2025-12-11,1,True,False,FL_1503
+1103663,FL,orange,"Malaysia, Thailand",,2025-12-12,0,False,False,
+1103659,FL,green,Canada,CA,2025-12-09,4,True,True,FL_0975;FL_0976;FL_0977;FL_0978
+1103655,FL,green,Iraq,IQ,2025-12-09,0,False,False,
+1103658,FL,green,Argentina,AR,2025-12-08,0,False,False,
+1103654,FL,green,Islamic Republic of Iran,IR,2025-12-08,0,False,False,
+1103649,FL,green,Vietnam,VN,2025-12-03,1,True,False,FL_1131
+1103652,FL,green,Cyprus,CY,2025-12-07,0,False,False,
+1103653,FL,green,Colombia,CO,2025-12-07,0,False,False,
+1103689,FL,green,Papua New Guinea,PG,2025-12-07,0,False,False,
+1103650,FL,green,Libya,LY,2025-12-05,0,False,False,
+1103651,FL,green,Bulgaria,BG,2025-12-05,0,False,False,
+1103638,FL,green,Türkiye,TR,2025-11-28,0,False,False,
+1103646,FL,red,"Indonesia, Malaysia, Thailand",,2025-12-03,0,False,False,
+1103563,FL,green,Italy,IT,2025-10-15,0,False,False,
+1103656,FL,green,France,FR,2025-12-04,1,True,False,FL_1543
+1103640,FL,orange,Sri Lanka,LK,2025-11-28,2,True,True,FL_1499;FL_1500
+1103647,FL,green,Algeria,DZ,2025-12-03,0,False,False,
+1103643,FL,green,"Bolivia, Spain",,2025-12-03,0,False,False,
+1103644,FL,green,"Brazil, Colombia",,2025-12-01,0,False,False,
+1103621,FL,orange,Thailand,TH,2025-11-17,1,True,False,FL_0924
+1103645,FL,green,Peru,PE,2025-11-27,0,False,False,
+1103642,FL,green,Panama,PA,2025-11-27,0,False,False,
+1103639,FL,green,Serbia,RS,2025-11-28,0,False,False,
+1103624,FL,green,South Africa,ZA,2025-11-23,0,False,False,
+1103628,FL,green,Mexico,MX,2025-11-22,0,False,False,
+1103634,FL,green,Malaysia,MY,2025-11-21,2,True,True,FL_1457;FL_1458
+1103635,FL,green,Slovakia,SK,2025-11-25,0,False,False,
+1103632,FL,green,Sri Lanka,LK,2025-11-26,2,True,True,FL_1499;FL_1500
+1103629,FL,green,Israel,IL,2025-11-24,0,False,False,
+1103630,FL,green,Jordan,JO,2025-11-24,0,False,False,
+1103631,FL,green,Lebanon,LB,2025-11-24,0,False,False,
+1103494,FL,green,Indonesia,ID,2025-09-09,3,True,True,FL_1369;FL_1370;FL_1371
+1103613,FL,green,Brazil,BR,2025-11-15,2,True,True,FL_1399;FL_1400
+1103637,FL,green,The Republic of North Macedonia,,2025-11-20,0,False,False,
+1103607,FL,green,France,FR,2025-11-14,0,False,False,
+1103616,FL,green,Albania,AL,2025-11-18,1,True,False,FL_1517
+1103627,FL,green,Bulgaria,BG,2025-11-21,0,False,False,
+1103648,FL,green,Papua New Guinea,PG,2025-11-20,0,False,False,
+1103614,FL,green,United States,US,2025-11-14,12,True,True,FL_0507;FL_0508;FL_0509;FL_0510;FL_0511;FL_0512;FL_0513;FL_0514;FL_0515;FL_0516;FL_0517;FL_0518
+1103558,FL,green,Colombia,CO,2025-10-12,0,False,False,
+1103615,FL,green,Philippines,PH,2025-11-15,4,True,True,FL_1224;FL_1225;FL_1226;FL_1227
+1103619,FL,green,Montenegro,ME,2025-11-18,0,False,False,
+1103622,FL,green,Cambodia,KH,2025-11-18,0,False,False,
+1103600,FL,green,Angola,AO,2025-11-06,0,False,False,
+1103608,FL,green,Islamic Republic of Iran,IR,2025-11-16,0,False,False,
+1103618,FL,green,India,IN,2025-11-19,3,True,True,FL_0389;FL_0390;FL_0391
+1103620,FL,green,Bolivia,BO,2025-11-17,0,False,False,
+1103617,FL,green,Slovenia,SI,2025-11-16,0,False,False,
+1103626,FL,green,Zambia,ZM,2025-11-16,0,False,False,
+1103603,FL,green,Vietnam,VN,2025-11-13,1,True,False,FL_1130
+1103612,FL,green,"Portugal, United Kingdom",,2025-11-17,0,False,False,
+1103623,FL,green,Mozambique,MZ,2025-11-15,0,False,False,
+1103609,FL,green,Iraq,IQ,2025-11-15,0,False,False,
+1103610,FL,green,Australia,AU,2025-11-15,1,True,False,FL_0961
+1103611,FL,green,Costa Rica,CR,2025-11-15,0,False,False,
+1103606,FL,green,Ireland,IE,2025-11-14,0,False,False,
+1103602,FL,green,Israel,IL,2025-11-13,1,True,False,FL_1502
+1103583,FL,green,Spain,ES,2025-10-28,1,True,False,FL_1348
+1103604,FL,green,Democratic Republic of Congo,,2025-11-14,0,False,False,
+1103601,FL,green,Portugal,PT,2025-11-12,2,True,True,FL_1511;FL_1512
+1103584,FL,green,Brazil,BR,2025-10-24,0,False,False,
+1103605,FL,green,Mexico,MX,2025-11-10,0,False,False,
+1103636,FL,green,Peru,PE,2025-11-10,0,False,False,
+1103598,FL,green,South Africa,ZA,2025-11-09,0,False,False,
+1103596,FL,green,"Australia, Serbia",,2025-11-06,0,False,False,
+1103597,FL,green,Libya,LY,2025-11-05,0,False,False,
+1103589,FL,green,Kenya,KE,2025-10-28,1,True,False,FL_1531
+1103599,FL,green,Democratic Republic of Congo,,2025-11-04,0,False,False,
+1103641,FL,green,China,CN,2025-11-04,2,True,True,FL_0720;FL_0721
+1103595,FL,green,Malaysia,MY,2025-11-03,0,False,False,
+1103593,FL,green,Dominican Republic,DO,2025-11-01,0,False,False,
+1103580,FL,green,United States,US,2025-10-25,16,True,True,FL_0490;FL_0491;FL_0492;FL_0493;FL_0494;FL_0495;FL_0496;FL_0497;FL_0498;FL_0499;FL_0500;FL_0501;FL_0502;FL_0503;FL_0504;FL_0505
+1103594,FL,green,Panama,PA,2025-10-24,0,False,False,
+1103590,FL,green,Uganda,UG,2025-10-29,0,False,False,
+1103571,FL,green,India,IN,2025-10-17,23,True,True,FL_0357;FL_0358;FL_0359;FL_0360;FL_0361;FL_0362;FL_0363;FL_0364;FL_0365;FL_0366;FL_0367;FL_0368;FL_0369;FL_0370;FL_0371;FL_0372;FL_0373;FL_0374;FL_0375;FL_0376;FL_0377;FL_0378;FL_0379
+1103574,FL,green,France,FR,2025-10-22,0,False,False,
+1103587,FL,green,Jamaica,JM,2025-10-28,1,True,False,FL_1479
+1103585,FL,orange,Cuba,CU,2025-10-28,1,True,False,FL_1494
+1103582,FL,green,Portugal,PT,2025-10-24,0,False,False,
+1103578,FL,green,The Republic of North Macedonia,,2025-10-26,0,False,False,
+1103579,FL,green,Algeria,DZ,2025-10-27,0,False,False,
+1103581,FL,green,Vietnam,VN,2025-10-26,2,True,True,FL_1128;FL_1129
+1103577,FL,green,Sudan,SD,2025-10-25,0,False,False,
+1103575,FL,green,Canada,CA,2025-10-25,1,True,False,FL_0972
+1103568,FL,green,Philippines,PH,2025-10-17,0,False,False,
+1103576,FL,green,China,CN,2025-10-21,1,True,False,FL_0720
+1103572,FL,green,Malaysia,MY,2025-10-24,1,True,False,FL_1456
+1103586,FL,green,Haiti,HT,2025-10-23,1,True,False,FL_1486
+1103573,FL,green,Türkiye,TR,2025-10-23,0,False,False,
+1103588,FL,green,Angola,AO,2025-10-16,0,False,False,
+1103567,FL,green,Algeria,DZ,2025-10-16,0,False,False,
+1103592,FL,green,Nicaragua,NI,2025-10-16,0,False,False,
+1103569,FL,green,Costa Rica,CR,2025-10-16,0,False,False,
+1103570,FL,green,Argentina,AR,2025-10-16,0,False,False,
+1103560,FL,green,Malaysia,MY,2025-10-14,1,True,False,FL_1456
+1103425,FL,green,Mexico,MX,2025-08-06,1,True,False,FL_0828
+1103561,FL,green,Venezuela,VE,2025-10-13,0,False,False,
+1103562,FL,green,Democratic Republic of Congo,,2025-10-08,0,False,False,
+1103565,FL,green,New Zealand,NZ,2025-10-13,1,True,False,FL_1353
+1103500,FL,green,United States,US,2025-09-12,11,True,True,FL_0455;FL_0456;FL_0457;FL_0458;FL_0459;FL_0460;FL_0461;FL_0462;FL_0463;FL_0464;FL_0465
+1103559,FL,green,Guatemala,GT,2025-10-12,0,False,False,
+1103556,FL,green,Spain,ES,2025-10-09,1,True,False,FL_1346
+1103557,FL,green,France,FR,2025-10-09,0,False,False,
+1103479,FL,orange,Nigeria,NG,2025-08-31,0,False,False,
+1103552,FL,green,Georgia,GE,2025-10-09,0,False,False,
+1103550,FL,green,Bulgaria,BG,2025-10-03,0,False,False,
+1103551,FL,green,China,CN,2025-10-07,0,False,False,
+1103542,FL,green,Romania,RO,2025-10-02,0,False,False,
+1103434,FL,orange,India,IN,2025-08-16,46,True,True,FL_0033;FL_0196;FL_0197;FL_0198;FL_0199;FL_0200;FL_0201;FL_0202;FL_0203;FL_0204;FL_0205;FL_0206;FL_0207;FL_0208;FL_0209;FL_0210;FL_0211;FL_0212;FL_0213;FL_0214;FL_0215;FL_0216;FL_0217;FL_0218;FL_0219;FL_0220;FL_0221;FL_0222;FL_0223;FL_0224;FL_0225;FL_0226;FL_0227;FL_0228;FL_0229;FL_0230;FL_0231;FL_0232;FL_0233;FL_0234;FL_0235;FL_0236;FL_0237;FL_0238;FL_0239;FL_0240
+1103545,FL,green,Chad,TD,2025-10-08,0,False,False,
+1103548,FL,green,Philippines,PH,2025-10-06,1,True,False,FL_1220
+1103533,FL,green,Senegal,SN,2025-10-01,0,False,False,
+1103522,FL,green,Vietnam,VN,2025-09-27,1,True,False,FL_1125
+1103553,FL,green,El Salvador,SV,2025-10-05,0,False,False,
+1103543,FL,green,Panama,PA,2025-10-05,0,False,False,
+1103540,FL,orange,Nepal,NP,2025-10-03,1,True,False,FL_1264
+1103541,FL,green,Norway,NO,2025-10-04,0,False,False,
+1103538,FL,green,Bhutan,BT,2025-10-04,1,True,False,FL_1482
+1103539,FL,green,Malaysia,MY,2025-10-04,0,False,False,
+1103566,FL,green,Myanmar,MM,2025-09-20,0,False,False,
+1103510,FL,green,Italy,IT,2025-09-21,1,True,False,FL_1290
+1103523,FL,green,Colombia,CO,2025-09-26,0,False,False,
+1103534,FL,green,Japan,JP,2025-10-01,0,False,False,
+1103535,FL,green,Costa Rica,CR,2025-10-01,0,False,False,
+1103536,FL,green,Guatemala,GT,2025-10-01,0,False,False,
+1103537,FL,green,Sudan,SD,2025-09-29,0,False,False,
+1103555,FL,green,Central African Republic,CF,2025-10-01,0,False,False,
+1103530,FL,green,Ukraine,UA,2025-09-30,0,False,False,
+1103549,FL,green,Honduras,HN,2025-09-29,0,False,False,
+1103532,FL,green,Laos,LA,2025-09-29,0,False,False,
+1103512,FL,green,Spain,ES,2025-09-20,0,False,False,
+1103529,FL,green,Nicaragua,NI,2025-09-28,0,False,False,
+1103546,FL,green,Angola,AO,2025-09-28,0,False,False,
+1103526,FL,green,Haiti,HT,2025-09-29,0,False,False,
+1103528,FL,green,Cuba,CU,2025-09-27,0,False,False,
+1103520,FL,green,Iceland,IS,2025-09-26,0,False,False,
+1103524,FL,green,Georgia,GE,2025-09-26,1,True,False,FL_1437
+1103525,FL,green,Azerbaijan,AZ,2025-09-25,0,False,False,
+1103521,FL,green,Dominican Republic,DO,2025-09-25,0,False,False,
+1103527,FL,green,Cambodia,KH,2025-09-25,0,False,False,
+1103531,FL,green,Guinea-Bissau,GW,2025-09-25,0,False,False,
+1103504,FL,orange,Yemen,YE,2025-09-16,0,False,False,
+1103514,FL,red,China,CN,2025-09-23,1,True,False,FL_0719
+1103515,FL,green,Brazil,BR,2025-09-23,0,False,False,
+1103516,FL,green,Croatia,HR,2025-09-23,0,False,False,
+1103517,FL,green,Algeria,DZ,2025-09-23,0,False,False,
+1103511,FL,green,France,FR,2025-09-20,0,False,False,
+1103502,FL,green,Thailand,TH,2025-09-15,5,True,True,FL_0907;FL_0908;FL_0909;FL_0910;FL_0911
+1103518,FL,green,El Salvador,SV,2025-09-21,0,False,False,
+1103496,FL,green,Philippines,PH,2025-09-08,2,True,True,FL_1217;FL_1218
+1103513,FL,green,Türkiye,TR,2025-09-20,0,False,False,
+1103442,FL,green,Senegal,SN,2025-08-15,0,False,False,
+1103509,FL,green,Bangladesh,BD,2025-09-18,0,False,False,
+1103554,FL,green,Central African Republic,CF,2025-09-16,0,False,False,
+1103508,FL,green,Honduras,HN,2025-09-17,0,False,False,
+1103503,FL,green,Slovenia,SI,2025-09-16,0,False,False,
+1103519,FL,green,Haiti,HT,2025-09-16,0,False,False,
+1103488,FL,green,Poland,PL,2025-09-05,0,False,False,
+1103491,FL,green,Vietnam,VN,2025-08-31,1,True,False,FL_1124
+1103499,FL,green,Costa Rica,CR,2025-09-12,0,False,False,
+1103498,FL,green,Canada,CA,2025-09-11,1,True,False,FL_0971
+1103454,FL,green,Sudan,SD,2025-08-17,0,False,False,
+1103443,FL,green,Italy,IT,2025-08-15,0,False,False,
+1103481,FL,green,Japan,JP,2025-09-02,1,True,False,FL_0894
+1103471,FL,green,Croatia,HR,2025-08-29,0,False,False,
+1103497,FL,green,Malaysia,MY,2025-09-09,1,True,False,FL_1455
+1103493,FL,green,Spain,ES,2025-09-09,0,False,False,
+1103492,FL,green,Germany,DE,2025-09-08,0,False,False,
+1103483,FL,green,France,FR,2025-09-02,0,False,False,
+1103490,FL,green,Colombia,CO,2025-09-05,0,False,False,
+1103487,FL,green,Sweden,SE,2025-09-03,1,True,False,FL_1271
+1103495,FL,green,South Korea,KR,2025-09-05,0,False,False,
+1103445,FL,green,China,CN,2025-08-16,3,True,True,FL_0715;FL_0716;FL_0717
+1103486,FL,green,Belgium,BE,2025-09-04,0,False,False,
+1103484,FL,green,Guatemala,GT,2025-09-02,0,False,False,
+1103474,FL,green,Slovenia,SI,2025-08-29,0,False,False,
+1103451,FL,green,Thailand,TH,2025-08-15,2,True,True,FL_0901;FL_0902
+1103482,FL,green,Switzerland,CH,2025-09-01,0,False,False,
+1103478,FL,green,Argentina,AR,2025-08-30,0,False,False,
+1103501,FL,green,The Gambia,,2025-08-30,0,False,False,
+1103485,FL,green,Albania,AL,2025-08-29,0,False,False,
+1103475,FL,green,Hungary,HU,2025-08-30,0,False,False,
+1103477,FL,green,Afghanistan,AF,2025-08-29,1,True,False,FL_1134
+1103433,FL,green,Philippines,PH,2025-08-11,0,False,False,
+1103473,FL,green,Netherlands,NL,2025-08-29,0,False,False,
+1103472,FL,green,Ireland,IE,2025-08-28,0,False,False,
+1103476,FL,green,Kenya,KE,2025-08-26,0,False,False,
+1103468,FL,green,Democratic Republic of Congo,,2025-08-27,0,False,False,
+1103467,FL,green,Laos,LA,2025-08-25,0,False,False,
+1103439,FL,green,Brazil,BR,2025-08-14,0,False,False,
+1103435,FL,orange,Pakistan,PK,2025-08-14,2,True,True,FL_0733;FL_0734
+1103466,FL,green,Myanmar,MM,2025-08-24,0,False,False,
+1103462,FL,green,Australia,AU,2025-08-20,2,True,True,FL_0956;FL_0957
+1103480,FL,green,Indonesia,ID,2025-08-24,1,True,False,FL_1368
+1103463,FL,green,Yemen,YE,2025-08-18,0,False,False,
+1103444,FL,green,Romania,RO,2025-08-16,0,False,False,
+1103459,FL,green,Japan,JP,2025-08-21,0,False,False,
+1103438,FL,green,Colombia,CO,2025-08-16,0,False,False,
+1103431,FL,green,Guinea,GN,2025-08-12,0,False,False,
+1103453,FL,green,Central African Republic,CF,2025-08-11,0,False,False,
+1103455,FL,green,France,FR,2025-08-19,0,False,False,
+1103458,FL,green,Vietnam,VN,2025-08-19,1,True,False,FL_1124
+1103470,FL,green,Mauritania,MR,2025-08-19,0,False,False,
+1103447,FL,green,Venezuela,VE,2025-08-17,0,False,False,
+1103457,FL,green,Uganda,UG,2025-08-18,0,False,False,
+1103450,FL,green,Spain,ES,2025-08-18,1,True,False,FL_1344
+1103452,FL,green,Canada,CA,2025-08-16,1,True,False,FL_0968
+1103448,FL,green,Bosnia & Herzegovina,,2025-08-17,0,False,False,
+1103449,FL,green,The Republic of North Macedonia,,2025-08-17,0,False,False,
+1103437,FL,green,Austria,AT,2025-08-14,0,False,False,
+1103465,FL,green,Czech Republic,CZ,2025-08-16,0,False,False,
+1103469,FL,green,Democratic Republic of Congo,,2025-08-04,0,False,False,
+1103436,FL,green,Iceland,IS,2025-08-15,0,False,False,
+1103440,FL,green,El Salvador,SV,2025-08-15,0,False,False,
+1103441,FL,green,"Mauritania, Western Sahara",,2025-08-15,0,False,False,
+1103460,FL,green,Kenya,KE,2025-08-15,0,False,False,
+1103432,FL,green,Indonesia,ID,2025-08-14,0,False,False,
+1103430,FL,green,South Korea,KR,2025-08-12,0,False,False,
+1103464,FL,green,Vietnam,VN,2025-08-12,0,False,False,
+1103456,FL,green,Ethiopia,ET,2025-08-03,0,False,False,
+1103461,FL,orange,Cape Verde,,2025-08-10,0,False,False,
+1103428,FL,green,Poland,PL,2025-08-10,0,False,False,
+1103429,FL,green,Cameroon,CM,2025-08-08,0,False,False,
+1103427,FL,green,Japan,JP,2025-08-07,1,True,False,FL_0893
+1103426,FL,green,Laos,LA,2025-08-08,0,False,False,
+1103421,FL,green,Colombia,CO,2025-08-02,0,False,False,
+1103423,FL,green,Venezuela,VE,2025-08-01,0,False,False,
+1103424,FL,green,Myanmar,MM,2025-08-03,0,False,False,
+1103418,FL,green,Australia,AU,2025-08-02,5,True,True,FL_0951;FL_0952;FL_0953;FL_0954;FL_0955
+1103419,FL,green,Sudan,SD,2025-08-01,0,False,False,
+1103422,FL,green,Türkiye,TR,2025-08-01,0,False,False,

@@ -1,172 +1,292 @@
-# CS5246 — Storms 'n' Stocks
+# Storms 'n' Stocks
 
-End-to-end NLP pipeline: disaster event detection from news → severity prediction → stock market impact analysis.
+End-to-end NLP pipeline: disaster event detection from news → severity prediction → stock market impact analysis (CAR).
 
-**Supported disaster types**: EQ (earthquake), TC (tropical cyclone), WF (wildfire), DR (drought), FL (flood). Volcano excluded.
+**Supported types**: EQ (earthquake), TC (tropical cyclone), WF (wildfire), DR (drought), FL (flood).
 
 ---
 
 ## Environment
 
 ```bash
-conda activate gdelt   # Python 3.10+
+conda env create -f environment.yml
+conda activate gdelt
+python -m spacy download en_core_web_sm
 ```
 
 ---
 
-## Data
+## Repository Layout
 
-| File | Description |
-|------|-------------|
-| `data/gdacs_all_fields_v2.csv` | GDACS severity training data — 2910 rows (EQ=670, TC=1438, WF=544, DR=258) |
-| `data/training_events_gdelt.xlsx` | GDELT news articles for event-type classifier training |
-| `data/llm_labels/` | LLM-labeled event-type annotations |
-| `data/splits/` | Time-based train/val/test splits for event-type classifier |
+```
+scripts/      Data collection, LLM labeling, training helpers, HPC SLURM scripts
+src/          Pipeline modules and evaluation scripts
+models/       Trained models (pre-built; see §Training)
+data/
+  gdacs_all_fields.csv          GDACS severity training data (2910 events)
+  training_events_gdelt.xlsx       GDELT news articles (source)
+  splits/                          Time-based train/val/test splits
+    train.csv / val.csv / test.csv  Labeled articles for classifier training & eval
+    trainval.csv                    Train+val merged (used for full-run sector validation)
+  llm_labels/                      LLM ground-truth annotations for eval
+    llm_labels_0_26326_s1000.csv   Event-type labels (4998 articles)
+    ner_labels_test.csv            Numeric field labels (test set)
+    location_labels_test.csv       Location labels (test set)
+    time_labels_test.csv           Time labels (test set)
+  results/                         Full-pipeline outputs (train+val+test input)
+  results_train/                Training-split pipeline run (sector mapping validation)
+  results_test/                 Held-out test-split pipeline run (final evaluation)
+  country_knowledge_base.json      Country → key industries KB
+  sector_etf_map.json              Sector label → ETF ticker map
+```
 
 ---
 
-## 1. Fetch GDACS severity training data
+## Pipeline Architecture
 
-GDACS API returns events in reverse-chronological order. Use `--balanced-per-level` to
-ensure orange/red events are represented (without it, the row cap is exhausted on green
-events before reaching orange/red pages).
+```
+GDELT articles (pre-labeled)
+      │
+      ▼
+[Module A] Event-type classifier (DistilBERT) → filter not_related
+[Module B] Per-article NER: time, location, type-specific numeric fields
+[Module C] Event clustering: same type + geo ≤500km + Δt ≤7d → unique events
+[Module D] GDACS matching: hit → use GDACS severity; miss → Module E
+[Module E] Severity classifier (RF) per event type (EQ/TC/WF/DR) or rule (FL)
+[Module F] Entity linking: country → sector ETFs (static prior + text extraction)
+[Module G] Event study (OLS, ACWI benchmark, 35-day window) → CAR T+1/T+3/T+5
+```
 
-**EQ / WF / DR** — balanced fetch from 2018:
+---
+
+## 1. Data Collection
+
+### 1a. GDACS severity training data
+
+Fetches historical GDACS records with balanced alert levels. **Required only to retrain severity classifiers** — pre-trained models are already in `models/`.
 
 ```bash
+# EQ / WF / DR  (2018–2026, balanced green/orange/red)
 python scripts/fetch_gdacs_all_fields.py \
   --event-types EQ,WF,DR \
-  --fromdate 2018-01-01 \
-  --balanced-per-level 500 \
-  --page-cap 5000 \
-  --workers 6 \
+  --fromdate 2018-01-01 --todate 2026-04-07 \
+  --balanced-per-level 500 --page-cap 5000 \
+  --workers 6 --request-sleep-sec 0.15 \
   --output data/gdacs_eq_wf_dr_balanced.csv
-```
 
-**TC** — fetches historical seasons back to 2008; TC endpoint may return HTTP 403,
-use conservative throttling:
-
-```bash
+# TC  (2008–2026; use fewer workers to avoid 403 rate-limit)
 python scripts/fetch_gdacs_all_fields.py \
   --event-types TC \
-  --fromdate 2008-01-01 \
-  --balanced-per-level 500 \
-  --page-cap 5000 \
-  --tc-workers 2 \
-  --request-sleep-sec 0.3 \
-  --retry-attempts 5 \
+  --fromdate 2008-01-01 --todate 2026-04-07 \
+  --balanced-per-level 500 --page-cap 5000 \
+  --workers 2 --request-sleep-sec 0.30 \
   --output data/gdacs_tc_balanced.csv
-```
 
-After fetching, merge into the final training file:
-
-```python
+# Merge
+python -c "
 import pandas as pd
-eq_wf_dr = pd.read_csv("data/gdacs_eq_wf_dr_balanced.csv")
-tc       = pd.read_csv("data/gdacs_tc_balanced.csv")
-pd.concat([eq_wf_dr, tc], ignore_index=True).to_csv("data/gdacs_all_fields_v2.csv", index=False)
+pd.concat([
+    pd.read_csv('data/gdacs_eq_wf_dr_balanced.csv'),
+    pd.read_csv('data/gdacs_tc_balanced.csv'),
+], ignore_index=True).to_csv('data/gdacs_all_fields.csv', index=False)
+"
 ```
+
+### 1b. LLM labeling (DeepSeek-V3 via SiliconFlow)
+
+These labels are **pre-computed** in `data/llm_labels/`. Re-run only if re-labeling from scratch.
+
+```bash
+# Event-type labels for classifier training (requires SILICONFLOW_API_KEY)
+python scripts/label_event_types.py
+
+# Ground-truth labels for extraction evaluation (test set only)
+python scripts/label_ner_fields.py      # numeric severity fields
+python scripts/label_locations.py       # country / lat-lon
+python scripts/label_times.py           # event date
+```
+
+HPC SLURM equivalents: `scripts/label_ner_fields_slurm.sh`, `scripts/label_times_slurm.sh`.
 
 ---
 
-## 2. Train severity classifiers
+## 2. Training
 
-Trains binary classifiers (green vs orange_or_red) for EQ / TC / WF / DR.
-FL uses a rule (no model needed).
+### 2a. Event-type classifier (DistilBERT)
 
-Orange and red are merged into one class because: (1) red events are too rare to train
-a reliable 3-class model (as few as 5 globally for WF); (2) both orange and red trigger
-significant stock market impact in the same direction, matching the granularity needed
-for Module E; (3) the semantic gap between green and orange is far larger than between
-orange and red in GDACS's own severity scale.
+**Pre-trained model**: `models/event_classifier_distilbert/checkpoint-890` (best checkpoint, Macro-F1 0.901 on test).
+
+To retrain from scratch (GPU required, ~25s on H100):
+
+```bash
+# Local
+python src/train_event_classifier_distilbert.py
+
+# NUS HPC (SLURM)
+sbatch scripts/train_distilbert_slurm.sh
+```
+
+First, prepare the train/val/test splits:
+
+```bash
+python scripts/prepare_classifier_data.py
+# Output: data/splits/train.csv, val.csv, test.csv
+```
+
+### 2b. Severity classifiers (Random Forest, per disaster type)
+
+**Pre-trained models**: `models/{eq,tc,wf,dr}_alertlevel_binary_classifier.pkl`.
+
+To retrain:
 
 ```bash
 python scripts/train_severity_classifiers.py \
-  --input data/gdacs_all_fields_v2.csv \
+  --input data/gdacs_all_fields.csv \
   --model-dir models/
 ```
 
-**Key options**:
+| Model | Type | Test Macro-F1 | ROC-AUC | Features |
+|-------|------|--------------|---------|---------|
+| `eq_alertlevel_binary_classifier.pkl` | EQ | 0.878 | 0.935 | magnitude, depth, rapid_pop fields |
+| `tc_alertlevel_binary_classifier.pkl` | TC | 0.815 | 0.926 | wind speed, storm surge, exposed pop |
+| `wf_alertlevel_binary_classifier.pkl` | WF | 0.798 | 0.960 | duration, burned area, people affected |
+| `dr_alertlevel_binary_classifier.pkl` | DR | ~0.51 (CV) | — | duration, affected area, country count |
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--event-types` | `EQ,TC,WF,DR` | Subset of types to train |
-| `--min-test-per-class` | `30` | Augment test set from train pool if below this |
-| `--random-state` | `42` | Reproducibility seed |
-
-**Split logic**: time-based split per type (train < 2025-04-30, val < 2025-07-31, test ≥ 2025-07-31).
-Falls back to stratified random split (70/10/20) if the train set has < 10 samples per class after
-the time split. Test sets with < 30 samples per class are augmented from the train pool.
-
-**Trained models** saved to `models/`:
-
-| Model file | Type | Macro-F1 (test) | Features |
-|------------|------|----------------|---------|
-| `eq_alertlevel_binary_classifier.pkl` | EQ | 0.878 | magnitude, depth, rapid_pop_people, rapid_pop_log, rapid_missing, rapid_few_people, rapid_unparsed |
-| `tc_alertlevel_binary_classifier.pkl` | TC | 0.815 | maximum_wind_speed_kmh, maximum_storm_surge_m, exposed_population |
-| `wf_alertlevel_binary_classifier.pkl` | WF | 0.798 | duration_days, burned_area_ha, people_affected |
-| `dr_alertlevel_binary_classifier.pkl` | DR | ~0.51 (CV) | duration_days, affected_area_km2, affected_country_count |
+FL uses a deterministic rule (no model): `dead > 100 or displaced > 80,000 → orange_or_red`.
 
 ---
 
-## 3. Train event-type classifier (Stage 2)
+## 3. Inference Pipeline
 
-Classifies news articles into: earthquake / flood / cyclone / wildfire / drought / not_related.
-
-**Baseline — TF-IDF + Logistic Regression**:
+Runs the full pipeline (Modules A–G) on a classified article CSV.
 
 ```bash
-python src/train_event_classifier.py
-# Output: models/event_classifier_tfidf_lr.pkl
-# Test Macro-F1: 0.661
+python src/pipeline.py --input data/splits/test.csv
+
+# Key options
+python src/pipeline.py \
+  --input   data/splits/test.csv \   # input CSV (must have: idx, label, text, timestamp)
+  --output-dir data/results_test/ \  # where to write results
+  --max-rows 100 \                   # process first N rows only (0 = all)
+  --skip-stock \                     # skip Module G (CAR analysis)
+  --verbose
 ```
 
-**Main model — DistilBERT fine-tuned**:
+**Input CSV columns**: `idx`, `label` (event type), `text` (article text), `timestamp`.  
+Articles with `label=not_related` are automatically filtered out.
+
+**Output files**:
+
+| File | Description |
+|------|-------------|
+| `events.csv` | One row per unique event cluster with all extracted fields + severity + sector ETFs |
+| `car_results.csv` | CAR(T+1/T+3/T+5) per event × ETF ticker pair |
+| `group_analysis.csv` | Group-level CAR statistics (mean, t-stat, p-value) by event_type × severity × sector |
+
+**NUS HPC** (SLURM):
 
 ```bash
-python src/train_event_classifier_distilbert.py
-# Output: models/event_classifier_distilbert/
+# Edit pipeline_slurm.sh to set INPUT and OUTPUT_DIR, then:
+sbatch scripts/pipeline_slurm.sh
 ```
 
 ---
 
-## 4. Severity inference (Module C)
+## 4. Evaluation
+
+All eval scripts read from `data/splits/test.csv` and `data/llm_labels/` by default.
+
+### Event-type classifier
+
+```bash
+python src/eval_event_classifier.py
+# --split val              evaluate on val set
+# --ckpt models/event_classifier_distilbert/checkpoint-890
+```
+
+Output: `data/results/distilbert_preds_test.csv` (per-sample predictions + confidence).
+
+### Location extractor
+
+```bash
+python src/eval_location_extractor.py
+# Output: data/results/location_extractor_eval.csv
+```
+
+### Time extractor
+
+```bash
+python src/eval_time_extractor.py
+# Output: data/results/time_extractor_eval.csv
+```
+
+### NER / numeric field extractor
+
+```bash
+python src/eval_ner_extractor.py
+python src/eval_ner_extractor.py --per-class   # breakdown by disaster type
+# Output: data/results/ner_extractor_eval.csv
+```
+
+### Clustering (GDACS-centric recall)
+
+```bash
+python scripts/eval_clustering_gdacs.py
+# Output: data/results/clustering_eval_gdacs.csv
+```
+
+---
+
+## 5. Pre-computed Results
+
+The `data/results/` directory contains outputs from the **full pipeline run** (all 4,998 labeled articles). Key files for paper reproduction:
+
+| File | Description |
+|------|-------------|
+| `distilbert_preds_test.csv` | Test-set classifier predictions (Macro-F1 0.901) |
+| `location_extractor_eval.csv` | Location accuracy (91.1% overall) |
+| `time_extractor_eval.csv` | Time accuracy (58.2% exact, 86.1% within 7 days) |
+| `ner_extractor_eval.csv` | NER field extraction quality |
+| `clustering_eval_gdacs.csv` | GDACS-centric clustering recall (32.4%) |
+| `events.csv` | 1,664 unique events |
+| `car_results.csv` | 5,161 event × ticker CAR pairs |
+| `group_analysis.csv` | Group-level CAR statistics |
+| `car_random_baseline.csv` | Random-date baseline CAR (for comparison) |
+
+**Training-split validation** (`data/results_train/`): pipeline run on `trainval.csv` used to empirically validate the candidate sector mapping. Results feed into `tab:car_train` in the paper.
+
+**Held-out test evaluation** (`data/results_test/`): pipeline run on `test.csv` only. 6,335 event × ticker pairs, 61 significant group-level CAR findings at p < 0.05.
+
+---
+
+## 6. Figures
+
+```bash
+python scripts/generate_report_figures.py
+# Generates figures to a local output directory (default: figures/)
+```
+
+---
+
+## Module API (quick reference)
 
 ```python
-from src.severity_predictor import SeverityPredictor
+from src.location_extractor   import extract_location
+from src.time_extractor        import extract_event_time
+from src.unified_event_extractor import UnifiedEventExtractor
+from src.severity_predictor    import SeverityPredictor
+from src.entity_linker         import EntityLinker
+from src.stock_analyser        import StockAnalyser
 
-predictor = SeverityPredictor()   # loads models lazily on first use
+extractor = UnifiedEventExtractor()
+result    = extractor.extract("M6.8 earthquake struck Nepal ...", "earthquake")
+# result["metrics"]["magnitude"]["value"] → 6.8
 
-# Single event (dict of extracted fields from Module A after Module D aggregation)
-result = predictor.predict({
-    "event_type": "EQ",
-    "magnitude": 6.8,
-    "depth": 35.0,
-    "rapidpopdescription": "500 thousand people in MMI VI",
-})
-# {"predicted_alert": "orange_or_red", "prob_orange_or_red": 0.87, "low_confidence": False}
+predictor = SeverityPredictor()
+pred      = predictor.predict({"event_type": "EQ", "magnitude": 6.8, "depth": 35.0})
+# pred["predicted_alert"] → "orange_or_red"
 
-# DataFrame of events
-results_df = predictor.predict_df(events_df)
-# Appends columns: predicted_alert, prob_orange_or_red, low_confidence
-```
-
-**low_confidence = True** when all key fields for the event type are missing after
-Module D aggregation (e.g. every article in a cluster failed feature extraction).
-
-**FL** is always rule-based: `dead > 100 or displaced > 80_000 → orange_or_red`.
-
----
-
-## Pipeline overview
-
-```
-GDELT GKG  →  Stage 1 (V1THEMES filter)
-           →  full-text crawl
-           →  Stage 2 (event-type classifier)       [src/train_event_classifier*.py]
-           →  Module A (per-article NER + regex)    [src/unified_event_extractor.py]
-           →  Module D (cluster & aggregate)
-           →  Module C (severity prediction)        [src/severity_predictor.py]
-           →  Module B (entity linking → country)
-           →  Module E (event study, yfinance CAR)
+linker = EntityLinker()
+link   = linker.link({"event_type": "WF", "country_iso2": "US", "location_text": "California"})
+# link["sector_etfs"] → ["IAK", "XLU", "WOOD", "XHB"]
 ```

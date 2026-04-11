@@ -17,3 +17,9 @@ __pycache__/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Paper files (local only)
+files/
+
+# Claude Code memory
+CLAUDE.md

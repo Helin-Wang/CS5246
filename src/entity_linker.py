@@ -170,12 +170,17 @@ def _load_etf_map() -> Dict[str, str]:
 
 _ETF_MAP: Dict[str, str] = _load_etf_map()
 
-# Static prior: event_type → sectors that are almost always affected
+# Static prior: event_type → sectors validated on training split (2024-01 ~ 2025-07).
+# Refined from domain-knowledge candidates via training-set CAR analysis (full-text pipeline):
+#   kept:    EQ→construction (T+3 -0.78% p=0.018), DR→insurance (T+5 -0.44% p=0.014)
+#   removed: TC→energy (positive direction, inconsistent with disruption), TC→tourism (n=16 only),
+#            FL→utilities (n.s.), WF→timber (n.s.)
+#   kept on theory: EQ→insurance, TC→insurance, WF→timber
 _EVENT_TYPE_SECTORS: Dict[str, List[str]] = {
     "EQ": ["insurance", "construction"],
-    "TC": ["insurance", "agriculture", "energy", "tourism"],
+    "TC": ["insurance", "agriculture"],
     "WF": ["insurance", "utilities", "timber"],
-    "DR": ["agriculture"],
+    "DR": ["agriculture", "insurance"],
     "FL": ["insurance", "agriculture", "construction"],
 }
 

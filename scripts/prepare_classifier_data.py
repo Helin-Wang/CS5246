@@ -31,12 +31,11 @@ SPLITS_DIR = ROOT / "data" / "splits"
 TRAIN_END = "2025-04-30"
 VAL_END   = "2025-07-31"
 
-TEXT_MAX_CHARS = 512  # title + first N chars of text_cleaned fed to classifier
-
-
 def build_text(title: str, text: str) -> str:
+    """Store full article text. DistilBERT tokenizer handles truncation at training/inference time.
+    NER and other downstream modules need the full text for accurate parameter extraction."""
     title   = str(title or "").strip()
-    snippet = str(text  or "").strip()[:TEXT_MAX_CHARS]
+    snippet = str(text  or "").strip()
     return f"{title} [SEP] {snippet}" if title else snippet
 
 

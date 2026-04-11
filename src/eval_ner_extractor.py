@@ -69,8 +69,8 @@ FIELD_MAP = {
     "displaced":             "displaced",
 }
 
-# Truncation length for NER extraction (same as training data)
-TEXT_LIMIT = 512
+# NER extraction uses full article text (no truncation).
+# TEXT_LIMIT applies only to Module A (time + location extraction).
 
 
 def run_eval(verbose: bool = False, per_class: bool = False):
@@ -106,9 +106,8 @@ def run_eval(verbose: bool = False, per_class: bool = False):
         else:
             body = raw_text
 
-        # Truncate body to TEXT_LIMIT chars (consistent with time/location eval)
-        body_trunc = body[:TEXT_LIMIT]
-        text_for_ner = f"{title} [SEP] {body_trunc}" if title else body_trunc
+        # Use full body text for NER (no truncation)
+        text_for_ner = f"{title} [SEP] {body}" if title else body
 
         event_type = str(row[label_col])
         result = extractor.extract(text_for_ner, event_type)
