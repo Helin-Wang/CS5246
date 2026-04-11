@@ -259,16 +259,7 @@ The `data/results/` directory contains outputs from the **full pipeline run** (a
 
 ---
 
-## 6. Figures
-
-```bash
-python scripts/generate_report_figures.py
-# Generates figures to a local output directory (default: figures/)
-```
-
----
-
-## Module API (quick reference)
+## 6. Module API (quick reference)
 
 ```python
 from src.location_extractor   import extract_location
